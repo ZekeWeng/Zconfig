@@ -1,0 +1,57 @@
+# Starship configuration for compact CLI visualization
+# Format: ~/path   branch !modified ?untracked ❯
+
+# Global timeout setting
+command_timeout = 5000
+
+# Define the prompt format
+format = """
+$directory\
+$git_branch\
+$git_status\
+$character"""
+
+# Directory configuration - show full path with ~ shortening
+[directory]
+format = "[$path]($style) "
+style = "cyan"
+truncation_length = 3
+truncate_to_repo = false
+truncation_symbol = "…/"
+
+# Git branch - simple branch name
+[git_branch]
+format = "[$branch]($style) "
+style = "purple"
+truncation_length = 9223372036854775807
+
+# Git status with count indicators
+[git_status]
+format = '([$all_status$ahead_behind]($style) )'
+style = "#2ea043"
+conflicted = "✗"
+ahead = "⇡"
+behind = "⇣"
+diverged = "⇕"
+up_to_date = ""
+untracked = "?${count}"
+modified = "!${count}"
+staged = "+${count}"
+renamed = "»${count}"
+deleted = "✘${count}"
+stashed = "*${count}"
+
+# Character - the prompt symbol
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+# Disable modules we don't need for clean look
+[git_commit]
+disabled = true
+
+[git_state]
+disabled = true
+
+[package]
+disabled = true
