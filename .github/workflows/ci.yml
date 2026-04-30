@@ -1,0 +1,115 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: warning
+          scandir: "."
+          additional_files: "install.sh"
+          # shellcheck cannot parse zsh — keep CI scope aligned with `make lint`
+          # and the local pre-commit shellcheck hook (both *.sh-only).
+          ignore_names: "*.zsh .zshrc .zshenv"
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  validate-json:
+    name: validate json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate every tracked JSON file
+        run: |
+          set -euo pipefail
+          failed=0
+          while IFS= read -r -d '' file; do
+            if ! python3 -m json.tool "$file" > /dev/null 2>&1; then
+              echo "::error file=$file::invalid JSON"
+              failed=1
+            fi
+          done < <(git ls-files -z '*.json')
+          exit $failed
+
+  validate-skills:
+    name: validate claude skills & rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pyyaml
+        run: python3 -m pip install --user pyyaml
+      - name: Parse frontmatter
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import pathlib, re, sys, yaml
+          fail = False
+          roots = ["./.claude/skills", "./.claude/rules"]
+          for root in roots:
+              for p in pathlib.Path(root).rglob("*.md"):
+                  text = p.read_text()
+                  m = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
+                  if not m:
+                      if root.endswith("skills"):
+                          print(f"::error file={p}::missing frontmatter")
+                          fail = True
+                      continue
+                  try:
+                      yaml.safe_load(m.group(1))
+                  except yaml.YAMLError as e:
+                      print(f"::error file={p}::invalid YAML frontmatter: {e}")
+                      fail = True
+          sys.exit(1 if fail else 0)
+          PY
+
+  smoke-corp:
+    name: smoke-test corp profile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: zconfig
+      - name: Pre-create SSH key (avoids ssh-keygen prompt under bootstrap_ssh)
+        run: |
+          mkdir -p "$HOME/.ssh"
+          ssh-keygen -t ed25519 -N "" -C "ci@example.com" -f "$HOME/.ssh/id_ed25519"
+      - name: Run install in corp profile
+        env:
+          ZCONFIG_DIR: ${{ github.workspace }}/zconfig
+          ZCONFIG_PROFILE: corp
+        run: bash "$ZCONFIG_DIR/install.sh"
+      - name: Verify symlinks
+        run: |
+          set -euo pipefail
+          for tgt in .zshrc .zshenv .gitconfig .gitignore_global .tmux.conf .config/nvim .config/starship.toml; do
+            if [[ ! -L "$HOME/$tgt" ]]; then
+              echo "::error::missing symlink: $HOME/$tgt"
+              exit 1
+            fi
+          done
+          test -f "$HOME/.gitconfig.local"
+          test -f "$HOME/.ssh/config"
+          test -f "$HOME/.ssh/config.local"
+          echo "all configs linked, identity files written"
