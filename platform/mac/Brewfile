@@ -1,0 +1,41 @@
+# Essential tools
+brew "neovim"
+brew "git"
+brew "zsh"
+brew "tmux"
+brew "fzf"
+brew "ripgrep"
+brew "fd"
+brew "bat"
+brew "htop"
+brew "eza"
+brew "lazygit"
+brew "gh"
+brew "starship"
+brew "shellcheck"        # used by `make lint` and the pre-commit shellcheck hook
+brew "tree-sitter-cli"   # CLI required by nvim-treesitter `main` branch (nvim 0.12+)
+
+# AI Tools — native binaries (no Node.js / no npm)
+cask "claude"           # Claude Desktop app
+cask "codex"            # OpenAI Codex CLI
+
+# Editor and Claude Code CLI are installed by mac/install.sh via direct
+# downloads with SHA256 verification (brew casks were unreliable for
+# claude-code @ 2.1.112 and visual-studio-code @ 1.117.0).
+
+# Development
+brew "node@22"       # LTS — bare `node` floats to current; pin for reproducibility
+brew "python@3.13"   # Pin a versioned formula — bare `python` is an alias and breaks `brew upgrade`
+brew "uv"
+brew "go"
+brew "rust"
+brew "elixir"
+
+# Database & Infrastructure
+brew "postgresql@15"
+brew "rabbitmq"
+brew "awscli"
+
+# Fonts
+cask "font-jetbrains-mono-nerd-font"
+cask "font-fira-code-nerd-font"
