@@ -1,0 +1,23 @@
+# macOS-only directive — silence "Bad configuration option" on Linux ssh.
+IgnoreUnknown UseKeychain
+
+# Machine-specific hosts (not committed)
+Include ~/.ssh/config.local
+
+# GitHub
+Host github.com
+  AddKeysToAgent yes
+  UseKeychain yes
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes
+
+# Defaults
+Host *
+  AddKeysToAgent yes
+  IdentityFile ~/.ssh/id_ed25519
+  IdentitiesOnly yes          # Only offer the configured key — don't flood servers with every key in the agent
+  HashKnownHosts yes          # Hash hostnames in known_hosts so a leak can't enumerate your infra
+  ServerAliveInterval 60      # Detect dead connections within ~3 minutes instead of hanging
+  ServerAliveCountMax 3
+  StrictHostKeyChecking accept-new   # Auto-trust first connection, refuse changed keys
+  VerifyHostKeyDNS yes        # Use SSHFP DNS records when present
