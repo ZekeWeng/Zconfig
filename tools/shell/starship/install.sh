@@ -17,9 +17,13 @@ install_starship() {
         return 0
     fi
     log_info "  starship unavailable via ${PKG_MANAGER} — falling back to pinned upstream installer"
-    verify_and_run \
+    local installer=/tmp/starship-install.sh
+    verify_and_download \
         https://starship.rs/install.sh \
-        /tmp/starship-install.sh \
-        "$STARSHIP_INSTALL_SHA256" \
-        -- -y
+        "$installer" \
+        "$STARSHIP_INSTALL_SHA256" || return 1
+    sh "$installer" -y
+    local rc=$?
+    rm -f "$installer"
+    return $rc
 }
