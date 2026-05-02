@@ -1,29 +1,42 @@
 #!/bin/bash
-# starship prompt — package manager first, hash-verified upstream installer fallback.
-# Bump STARSHIP_INSTALL_SHA256 when upstream releases a new installer:
-#   curl -fsSL https://starship.rs/install.sh | shasum -a 256
+# starship prompt — pinned native binary (Linux only). macOS uses brew.
+# Bump STARSHIP_VERSION + hashes when upgrading:
+#   curl -fsSL https://github.com/starship/starship/releases/download/<ver>/starship-<arch>-unknown-linux-musl.tar.gz | shasum -a 256
 
 source "${ZCONFIG_DIR:-$HOME/.zconfig}/lib/bootstrap.sh"
 
-STARSHIP_INSTALL_SHA256="52c64f14a558034ebeb1907ea9364e802b32474576fd3e68265f73bc33cc8fbb"
+STARSHIP_VERSION="v1.25.1"
 
 install_starship() {
     if command -v starship &> /dev/null; then
         log_info "starship already installed; skipping"
         return 0
     fi
-    log_info "Installing starship..."
-    if pkg_has starship && pkg_install starship; then
-        return 0
-    fi
-    log_info "  starship unavailable via ${PKG_MANAGER} — falling back to pinned upstream installer"
-    local installer=/tmp/starship-install.sh
+    local triple sha
+    case "$ARCH" in
+        x86_64)
+            triple="x86_64-unknown-linux-musl"
+            sha="c6ddd3ecb9c0071a2ad38d98cee748160066b7c4f197421268058f4a5d6f8504"
+            ;;
+        aarch64)
+            triple="aarch64-unknown-linux-musl"
+            sha="01517aab398959ea9ea73bdb4f032ea4dbb51dff5c8e5eb05b4a1b9b7ab872b8"
+            ;;
+        *)
+            log_info "Skipping starship — unsupported arch: $(uname -m)"
+            return 0
+            ;;
+    esac
+    local asset="starship-${triple}.tar.gz"
+
+    log_info "Installing starship ${STARSHIP_VERSION} (pinned)..."
+    local tmp="/tmp/${asset}"
+    # shellcheck disable=SC2064  # bake paths now; RETURN traps fire in each enclosing frame
+    trap "rm -f '$tmp' /tmp/starship" RETURN
     verify_and_download \
-        https://starship.rs/install.sh \
-        "$installer" \
-        "$STARSHIP_INSTALL_SHA256" || return 1
-    sh "$installer" -y
-    local rc=$?
-    rm -f "$installer"
-    return $rc
+        "https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/${asset}" \
+        "$tmp" \
+        "$sha"
+    tar -xzf "$tmp" -C /tmp starship
+    sudo install -m 755 /tmp/starship /usr/local/bin/starship
 }
