@@ -36,10 +36,15 @@ run_installer nerd-fonts
 run_installer claude-code
 run_installer codex
 
-# Set zsh as the login shell if it isn't already
+# Set zsh as the login shell if it isn't already. chsh requires PAM auth on
+# most distros, which fails for passwordless users (CI runners, container
+# images). Treat failure as non-fatal and surface manual instructions.
 if [[ "$SHELL" != "$(command -v zsh)" ]]; then
     log_info "Setting zsh as default shell..."
-    chsh -s "$(command -v zsh)"
+    if ! chsh -s "$(command -v zsh)"; then
+        log_info "  chsh failed (likely no interactive auth available)."
+        log_info "  Run manually when ready: chsh -s \$(command -v zsh)"
+    fi
 fi
 
 log_ok "Linux installation complete."
