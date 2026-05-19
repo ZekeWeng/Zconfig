@@ -6,7 +6,20 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-export ZCONFIG_DIR="${ZCONFIG_DIR:-$HOME/.zconfig}"
+# Self-locate so `./install.sh` works from any clone path. The runtime configs
+# (.zshrc, .zshenv) hard-reference ~/.zconfig, so ensure that symlink exists.
+_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export ZCONFIG_DIR="${ZCONFIG_DIR:-$_SELF_DIR}"
+
+if [[ ! -e "$HOME/.zconfig" ]]; then
+    ln -s "$ZCONFIG_DIR" "$HOME/.zconfig"
+elif [[ -L "$HOME/.zconfig" && "$(readlink "$HOME/.zconfig")" != "$ZCONFIG_DIR" ]]; then
+    echo "warning: ~/.zconfig points to $(readlink "$HOME/.zconfig"), not $ZCONFIG_DIR" >&2
+    echo "         runtime configs reference ~/.zconfig — fix this or runtime will break." >&2
+elif [[ ! -L "$HOME/.zconfig" && "$HOME/.zconfig" != "$ZCONFIG_DIR" ]]; then
+    echo "warning: ~/.zconfig is a real dir at a different location than $ZCONFIG_DIR" >&2
+    echo "         runtime configs reference ~/.zconfig — resolve before proceeding." >&2
+fi
 
 source "$ZCONFIG_DIR/lib/common.sh"
 source "$ZCONFIG_DIR/lib/env.sh"
