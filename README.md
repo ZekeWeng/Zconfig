@@ -8,11 +8,9 @@ Cross-platform dotfiles for macOS and Linux. One command bootstraps a complete d
 - **Shell** — Zsh + Starship prompt, with fzf, ripgrep, fd, eza
 - **Terminal** — tmux session config and SSH client setup
 - **Version control** — Git, lazygit, gh, pre-commit hooks
-- **AI tooling** — Claude Code and Codex CLIs
-- **Languages** — Node, Python (uv), Go, Rust, Elixir
 - **Cross-platform** — One install path across macOS (Homebrew) and Linux (apt/dnf/pacman)
 - **Reproducible** — every download pinned with SHA256, every step idempotent
-- **Corp-friendly** — `install-corp` profile for managed machines: configs + identity, no downloads, no sudo
+- **Corp-friendly** — `install-corp` profile for managed machines: zsh config only, no downloads, no sudo
 
 ## Quick start
 
