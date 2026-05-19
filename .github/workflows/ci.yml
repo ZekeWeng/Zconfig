@@ -96,21 +96,21 @@ jobs:
           ZCONFIG_DIR: ${{ github.workspace }}/zconfig
           ZCONFIG_PROFILE: corp
         run: bash "$ZCONFIG_DIR/install.sh"
-      - name: Verify corp links only zsh, nothing else
+      - name: Verify corp links terminal styling, nothing else
         run: |
           set -euo pipefail
-          # Required symlinks
-          for tgt in .zshrc .zshenv; do
+          # Required symlinks (corp = zsh + starship + tmux)
+          for tgt in .zshrc .zshenv .tmux.conf .config/starship.toml; do
             if [[ ! -L "$HOME/$tgt" ]]; then
               echo "::error::missing symlink: $HOME/$tgt"
               exit 1
             fi
           done
           # Things corp must NOT create
-          for forbidden in .gitconfig .gitignore_global .tmux.conf .config/nvim .config/starship.toml .gitconfig.local .ssh/config .ssh/config.local .ssh/id_ed25519; do
+          for forbidden in .gitconfig .gitignore_global .config/nvim .gitconfig.local .ssh/config .ssh/config.local .ssh/id_ed25519; do
             if [[ -e "$HOME/$forbidden" ]]; then
               echo "::error::corp profile leaked $HOME/$forbidden"
               exit 1
             fi
           done
-          echo "corp profile: zsh-only, no side effects"
+          echo "corp profile: terminal styling linked, no identity, no nvim"

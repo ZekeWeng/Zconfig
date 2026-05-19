@@ -35,13 +35,20 @@ log_info "Starting dotfiles installation..."
 ensure_env_file       "$ZCONFIG_DIR"
 load_env              "$ZCONFIG_DIR/.env"
 
-# Corp profile: zsh config only. No starship, no tmux, no SSH key, no
-# gitconfig identity, no downloads, no sudo, no package installs.
+# Corp profile: terminal styling (zsh + starship + tmux) + a lean brew bundle
+# (essentials + fonts, no languages/DB/AI casks). No SSH key, no gitconfig
+# identity, no VSCode/Claude Code direct downloads, no lazy.nvim, no pre-commit.
+# On Linux, runs symlinks only (apt/dnf/pacman would need sudo).
 # Set via env var or .env (ZCONFIG_PROFILE=corp).
 if [[ "${ZCONFIG_PROFILE:-full}" == "corp" ]]; then
     link_configs "$ZCONFIG_DIR" "${ZCONFIG_SYMLINKS_CORP[@]}"
-    log_ok "Corp profile — linked zsh config only."
+    if [[ "$(uname)" == "Darwin" ]] && command -v brew &> /dev/null; then
+        log_info "Installing corp Homebrew packages..."
+        brew bundle --file="$ZCONFIG_DIR/platform/mac/Brewfile.corp"
+    fi
+    log_ok "Corp profile — terminal styling linked."
     log_info "Restart your terminal or run: exec zsh"
+    log_info "Set your terminal font to 'JetBrainsMono Nerd Font' for best appearance"
     exit 0
 fi
 

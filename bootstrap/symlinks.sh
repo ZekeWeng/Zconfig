@@ -4,8 +4,8 @@
 # link inside it. We refuse and surface a clear error.
 #
 # Two symlink sets:
-#   ZCONFIG_SYMLINKS_CORP — zsh shell config only (corp profile uses this)
-#   ZCONFIG_SYMLINKS      — full set (shell + prompt + tmux + editor + git)
+#   ZCONFIG_SYMLINKS_CORP — terminal styling (zsh + starship + tmux)
+#   ZCONFIG_SYMLINKS      — full set (corp + editor + git)
 # scripts/backup.sh iterates the full set so backups stay comprehensive.
 
 [[ -n "${_ZCONFIG_BOOTSTRAP_SYMLINKS_LOADED:-}" ]] && return 0
@@ -15,12 +15,12 @@ _ZCONFIG_BOOTSTRAP_SYMLINKS_LOADED=1
 ZCONFIG_SYMLINKS_CORP=(
     "tools/shell/zsh/config/.zshrc::.zshrc"
     "tools/shell/zsh/config/.zshenv::.zshenv"
+    "tools/shell/starship/config/starship.toml::.config/starship.toml"
+    "tools/terminal/tmux/config/.tmux.conf::.tmux.conf"
 )
 
 ZCONFIG_SYMLINKS=(
     "${ZCONFIG_SYMLINKS_CORP[@]}"
-    "tools/terminal/tmux/config/.tmux.conf::.tmux.conf"
-    "tools/shell/starship/config/starship.toml::.config/starship.toml"
     "tools/editor/neovim/config::.config/nvim"
     "tools/workflow/git/config/.gitconfig::.gitconfig"
     "tools/workflow/git/config/.gitignore_global::.gitignore_global"

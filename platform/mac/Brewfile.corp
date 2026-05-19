@@ -1,0 +1,22 @@
+# Corp profile Brewfile — essentials + fonts only.
+# No languages, no DB/infra, no AI casks. Consumed by install.sh when
+# ZCONFIG_PROFILE=corp on macOS.
+
+# Essential tools
+brew "neovim"
+brew "git"
+brew "zsh"
+brew "tmux"
+brew "fzf"
+brew "ripgrep"
+brew "fd"
+brew "eza"
+brew "lazygit"
+brew "gh"
+brew "starship"
+brew "shellcheck"
+brew "tree-sitter-cli"
+
+# Fonts
+cask "font-jetbrains-mono-nerd-font"
+cask "font-fira-code-nerd-font"
