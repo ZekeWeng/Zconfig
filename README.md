@@ -5,7 +5,7 @@ Cross-platform dotfiles for macOS and Linux. One command bootstraps a complete d
 ## Features
 
 - **Editor** — Neovim (lazy.nvim, LSP, treesitter) and VSCode, both pinned
-- **Shell** — Zsh + Starship prompt, with fzf, ripgrep, fd, bat, eza, htop
+- **Shell** — Zsh + Starship prompt, with fzf, ripgrep, fd, eza
 - **Terminal** — tmux session config and SSH client setup
 - **Version control** — Git, lazygit, gh, pre-commit hooks
 - **AI tooling** — Claude Code and Codex CLIs
@@ -27,7 +27,7 @@ macOS prereqs: `xcode-select --install` and Homebrew. Run `make` (no args) for t
 | Target | What it does |
 |---|---|
 | `make install` | Symlinks + per-tool installs (brew bundle, apt repos, pinned binaries) |
-| `make install-corp` | Configs + identity only — no downloads, no sudo. For corp-managed machines |
+| `make install-corp` | Zsh config only (`.zshrc`, `.zshenv`) — no downloads, no sudo, no SSH/git identity |
 | `make update` | Pull repo, upgrade packages, refresh nvim plugins / VSCode / Claude Code |
 | `make backup` | Snapshot `~/` dotfiles to `~/.zconfig_backup` |
 
@@ -37,7 +37,7 @@ Develop with `make check` (syntax) and `make lint` (shellcheck).
 
 - **Identity** — first install seeds `.env` from `.env.example`. Set your name and email there; they render into `~/.gitconfig.local` and SSH config.
 - **Live edits** — configs are symlinked, so editing `~/.zconfig/...` applies on the next shell.
-- **Corp environments** — `make install-corp` skips every download, package install, and GitHub clone. Configs that reference missing tools are `command -v`-guarded and no-op silently. Caveat: first `nvim` launch still tries to clone `lazy.nvim` from GitHub — vendor it into `~/.local/share/nvim/lazy/lazy.nvim` ahead of time if you're firewalled.
+- **Corp environments** — `make install-corp` links only `.zshrc` and `.zshenv` and exits. No starship, no tmux, no SSH key, no `~/.gitconfig`, no nvim config, no downloads. Configs that reference missing tools are `command -v`-guarded and no-op silently — the prompt falls back to plain zsh.
 
 ---
 

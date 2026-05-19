@@ -3,21 +3,27 @@
 # footgun: if $TARGET is an existing real directory, ln -sf silently nests the
 # link inside it. We refuse and surface a clear error.
 #
-# ZCONFIG_SYMLINKS is the single source of truth for what gets symlinked. Both
-# link_configs (here) and scripts/backup.sh iterate it.
+# Two symlink sets:
+#   ZCONFIG_SYMLINKS_CORP — zsh shell config only (corp profile uses this)
+#   ZCONFIG_SYMLINKS      — full set (shell + prompt + tmux + editor + git)
+# scripts/backup.sh iterates the full set so backups stay comprehensive.
 
 [[ -n "${_ZCONFIG_BOOTSTRAP_SYMLINKS_LOADED:-}" ]] && return 0
 _ZCONFIG_BOOTSTRAP_SYMLINKS_LOADED=1
 
 # Each entry: "<repo-relative-source>::<target-relative-to-$HOME>".
-ZCONFIG_SYMLINKS=(
-    "tools/editor/neovim/config::.config/nvim"
+ZCONFIG_SYMLINKS_CORP=(
     "tools/shell/zsh/config/.zshrc::.zshrc"
     "tools/shell/zsh/config/.zshenv::.zshenv"
-    "tools/workflow/git/config/.gitconfig::.gitconfig"
-    "tools/workflow/git/config/.gitignore_global::.gitignore_global"
+)
+
+ZCONFIG_SYMLINKS=(
+    "${ZCONFIG_SYMLINKS_CORP[@]}"
     "tools/terminal/tmux/config/.tmux.conf::.tmux.conf"
     "tools/shell/starship/config/starship.toml::.config/starship.toml"
+    "tools/editor/neovim/config::.config/nvim"
+    "tools/workflow/git/config/.gitconfig::.gitconfig"
+    "tools/workflow/git/config/.gitignore_global::.gitignore_global"
 )
 
 # safe_link <src> <tgt>
@@ -41,11 +47,13 @@ safe_link() {
 }
 
 link_configs() {
-    local d="$1"
-    mkdir -p "$HOME/.config" "$HOME/.ssh"
+    local d="$1"; shift
+    local entries=("$@")
+    (( ${#entries[@]} == 0 )) && entries=("${ZCONFIG_SYMLINKS[@]}")
+    mkdir -p "$HOME/.config"
     log_info "Linking configs..."
     local entry src tgt
-    for entry in "${ZCONFIG_SYMLINKS[@]}"; do
+    for entry in "${entries[@]}"; do
         src="${entry%%::*}"
         tgt="${entry##*::}"
         mkdir -p "$HOME/$(dirname "$tgt")"

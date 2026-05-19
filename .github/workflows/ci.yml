@@ -91,25 +91,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: zconfig
-      - name: Pre-create SSH key (avoids ssh-keygen prompt under bootstrap_ssh)
-        run: |
-          mkdir -p "$HOME/.ssh"
-          ssh-keygen -t ed25519 -N "" -C "ci@example.com" -f "$HOME/.ssh/id_ed25519"
       - name: Run install in corp profile
         env:
           ZCONFIG_DIR: ${{ github.workspace }}/zconfig
           ZCONFIG_PROFILE: corp
         run: bash "$ZCONFIG_DIR/install.sh"
-      - name: Verify symlinks
+      - name: Verify corp links only zsh, nothing else
         run: |
           set -euo pipefail
-          for tgt in .zshrc .zshenv .gitconfig .gitignore_global .tmux.conf .config/nvim .config/starship.toml; do
+          # Required symlinks
+          for tgt in .zshrc .zshenv; do
             if [[ ! -L "$HOME/$tgt" ]]; then
               echo "::error::missing symlink: $HOME/$tgt"
               exit 1
             fi
           done
-          test -f "$HOME/.gitconfig.local"
-          test -f "$HOME/.ssh/config"
-          test -f "$HOME/.ssh/config.local"
-          echo "all configs linked, identity files written"
+          # Things corp must NOT create
+          for forbidden in .gitconfig .gitignore_global .tmux.conf .config/nvim .config/starship.toml .gitconfig.local .ssh/config .ssh/config.local .ssh/id_ed25519; do
+            if [[ -e "$HOME/$forbidden" ]]; then
+              echo "::error::corp profile leaked $HOME/$forbidden"
+              exit 1
+            fi
+          done
+          echo "corp profile: zsh-only, no side effects"

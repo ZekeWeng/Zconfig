@@ -15,6 +15,8 @@ bootstrap_ssh() {
         return 1
     fi
 
+    mkdir -p "$HOME/.ssh"
+
     # Seed config.local once so users have somewhere to add machine-specific hosts.
     if [[ ! -f "$HOME/.ssh/config.local" ]]; then
         cp "$zconfig_dir/tools/terminal/ssh/config/config.local.example" "$HOME/.ssh/config.local"

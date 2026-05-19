@@ -19,23 +19,23 @@ source "$ZCONFIG_DIR/tools/workflow/precommit/install.sh"
 
 log_info "Starting dotfiles installation..."
 
-# Steps that only touch $HOME — safe in any environment, no downloads.
 ensure_env_file       "$ZCONFIG_DIR"
 load_env              "$ZCONFIG_DIR/.env"
-link_configs          "$ZCONFIG_DIR"
-bootstrap_ssh         "$ZCONFIG_DIR"
-write_gitconfig_local
 
-# Corp profile stops here: configs are linked, identity files written, no
-# downloads, no sudo, no GitHub clones, no package installs. Set via env
-# var or .env (ZCONFIG_PROFILE=corp).
+# Corp profile: zsh config only. No starship, no tmux, no SSH key, no
+# gitconfig identity, no downloads, no sudo, no package installs.
+# Set via env var or .env (ZCONFIG_PROFILE=corp).
 if [[ "${ZCONFIG_PROFILE:-full}" == "corp" ]]; then
-    log_ok "Corp profile — skipped tool installers, brew bundle, lazy.nvim, pre-commit hooks."
+    link_configs "$ZCONFIG_DIR" "${ZCONFIG_SYMLINKS_CORP[@]}"
+    log_ok "Corp profile — linked zsh config only."
     log_info "Restart your terminal or run: exec zsh"
     exit 0
 fi
 
-# Full profile: download/install tooling.
+# Full profile: full symlink set + identity + downloads.
+link_configs          "$ZCONFIG_DIR"
+bootstrap_ssh         "$ZCONFIG_DIR"
+write_gitconfig_local
 install_lazy_nvim
 
 case "$(uname)" in
