@@ -1,11 +1,6 @@
 # General Coding Standards
 
-## Simplicity First
-
-- Write the simplest code that solves the problem — no speculative abstractions
-- Three similar lines are better than a premature abstraction
-- Don't add configurability, feature flags, or extension points until a second use case exists
-- Delete dead code — don't comment it out or leave `// removed` markers
+Code-shape rules: naming, function design, error handling, organization. For simplicity, scope discipline, and how to work, see `working-style.md`.
 
 ## Naming and Clarity
 

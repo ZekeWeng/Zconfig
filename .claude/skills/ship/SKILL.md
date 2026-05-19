@@ -26,11 +26,12 @@ disable-model-invocation: true
 
 3. **Test.** Detect the project test command (`package.json` scripts, `Makefile`, `justfile`, `pytest`, `go test ./...`, `cargo test`). Run it. **If tests fail, stop and report.** Never ship red.
 
-4. **Self-review.** Run `git diff origin/$default..HEAD`. Confirm:
+4. **Self-review.** Run `git diff origin/$default..HEAD`. Apply the "Surgical Changes" test from `.claude/rules/working-style.md` — every changed line should trace to the user's request. Confirm:
    - No debug prints (`console.log`, `print()`, `dbg!`)
    - No commented-out code blocks
    - No stray files (`.DS_Store`, `*.swp`, editor backups)
    - No secrets in the diff
+   - No "while I'm here" edits unrelated to the PR's purpose
 
 5. **Push.** `git push -u origin $(git rev-parse --abbrev-ref HEAD)`.
 

@@ -24,3 +24,4 @@ disable-model-invocation: true
 - Follow existing project conventions exactly — don't introduce new patterns
 - Include basic happy-path tests at minimum
 - Wire up the feature so it's importable but not necessarily integrated
+- Scaffold only what was asked — no speculative files, configs, or hooks (see `.claude/rules/working-style.md` "Simplicity First")

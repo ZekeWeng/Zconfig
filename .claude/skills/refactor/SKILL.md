@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 # Refactor: $ARGUMENTS
 
+Surgical-changes discipline applies throughout — see `.claude/rules/working-style.md`.
+
 ## Invariant
 
 **A refactor does not change behavior.** Every test that passed before must pass after. Every observable effect must remain the same. If you're changing what the code does, that's a feature change — use a different skill.

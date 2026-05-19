@@ -34,7 +34,7 @@ List the edges the plan currently does **not** handle:
 
 ## Pass 4: Hidden Assumptions
 
-Call out every assumption the plan relies on. For each: "What if this isn't true?"
+Per "Think Before Coding" (`.claude/rules/working-style.md`), call out every assumption the plan relies on. For each: "What if this isn't true?"
 - Invariants about data shape or ordering
 - Availability of external systems
 - Performance assumptions (latency, throughput, memory)

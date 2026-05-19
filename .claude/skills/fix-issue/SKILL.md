@@ -23,5 +23,5 @@ disable-model-invocation: true
 
 ## Rules
 - Keep changes minimal — only fix what the issue describes
-- Always write a failing test first when possible
+- Always write a failing test first when possible (Goal-Driven Execution — see `.claude/rules/working-style.md`)
 - Reference the issue number in the commit message (e.g., "Fixes #$ARGUMENTS")
