@@ -20,11 +20,10 @@ if [[ -d "$HOME/.nvm" ]]; then
 fi
 
 # Python — add every ~/Library/Python/3.x/bin that exists (macOS user-site).
-if command -v python3 &> /dev/null; then
-    for p in "$HOME"/Library/Python/3.*/bin; do
-        [[ -d "$p" ]] && export PATH="$p:$PATH"
-    done
-fi
+# (N) is zsh nullglob: no match expands to nothing instead of erroring.
+for p in "$HOME"/Library/Python/3.*/bin(N); do
+    export PATH="$p:$PATH"
+done
 
 # Keg-only Homebrew formulas — link explicitly when present.
 for keg in node@22 postgresql@15; do
