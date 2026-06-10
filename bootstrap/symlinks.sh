@@ -29,10 +29,10 @@ ZCONFIG_SYMLINKS=(
 # safe_link <src> <tgt>
 # - missing tgt:           create symlink
 # - tgt is a symlink:      atomic replace via `ln -sfn`
-# - tgt is a real file:    overwrite via `ln -sf`
+# - tgt is a real file:    move aside to <tgt>.bak.<timestamp>, then link
 # - tgt is a real dir:     fail loudly — never silently nest
 safe_link() {
-    local src="$1" tgt="$2"
+    local src="$1" tgt="$2" bak
     if [[ -L "$tgt" ]]; then
         ln -sfn "$src" "$tgt"
     elif [[ -d "$tgt" ]]; then
@@ -40,7 +40,10 @@ safe_link() {
         log_err "  Move it aside (e.g. mv $tgt ${tgt}.bak-\$(date +%s)) and re-run."
         return 1
     elif [[ -e "$tgt" ]]; then
-        ln -sf "$src" "$tgt"
+        bak="${tgt}.bak.$(date +%Y%m%d%H%M%S)"
+        mv "$tgt" "$bak"
+        log_info "  backed up existing $tgt to $bak"
+        ln -s "$src" "$tgt"
     else
         ln -s "$src" "$tgt"
     fi

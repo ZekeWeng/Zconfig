@@ -13,7 +13,7 @@ install_eza() {
         apt)
             sudo install -d -m 0755 /etc/apt/keyrings
             curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
-                | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+                | sudo gpg --dearmor --yes -o /etc/apt/keyrings/gierens.gpg
             echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
                 | sudo tee /etc/apt/sources.list.d/gierens.list > /dev/null
             sudo apt-get update

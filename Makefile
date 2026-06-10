@@ -1,7 +1,7 @@
 # zconfig — entrypoint. Run `make` for the menu.
 .DEFAULT_GOAL := help
 
-SHELLS := install.sh $(shell find lib bootstrap tools platform scripts -name '*.sh' 2>/dev/null)
+SHELLS := install.sh bootstrap.sh $(shell find lib bootstrap tools platform scripts -name '*.sh' 2>/dev/null)
 
 .PHONY: help install install-corp update backup check lint all
 

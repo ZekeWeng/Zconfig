@@ -12,11 +12,16 @@ if [[ -f "$HOME/.cargo/env" ]]; then
     source "$HOME/.cargo/env"
 fi
 
-# Node.js (if using nvm)
+# Node.js (if using nvm) — lazy-loaded. Sourcing nvm.sh eagerly costs ~400ms
+# and dominates shell startup; this stub loads the real nvm on first use.
 if [[ -d "$HOME/.nvm" ]]; then
     export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-    [ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+    nvm() {
+        unfunction nvm
+        [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+        [ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+        nvm "$@"
+    }
 fi
 
 # Python — add every ~/Library/Python/3.x/bin that exists (macOS user-site).

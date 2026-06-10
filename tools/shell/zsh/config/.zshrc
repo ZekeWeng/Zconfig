@@ -4,21 +4,29 @@
 # ── Modules ──────────────────────────────────────────────
 # Each module is a single-purpose file in ~/.zconfig/tools/shell/zsh/config/.
 _zconfig_modules=(path aliases functions)
-[[ "$(uname)" == "Linux" ]] && _zconfig_modules+=(linux)
+[[ "$OSTYPE" == linux* ]] && _zconfig_modules+=(linux)  # $OSTYPE: no uname fork
 for m in "${_zconfig_modules[@]}"; do
     [[ -f ~/.zconfig/tools/shell/zsh/config/${m}.zsh ]] && \
         source ~/.zconfig/tools/shell/zsh/config/${m}.zsh
 done
 unset _zconfig_modules m
 
+# ── Shell options ────────────────────────────────────────
+# Early: EXTENDED_GLOB must be on before the completion block below — its
+# (#q...) glob qualifier parses as a literal string without it.
+setopt AUTO_CD GLOB_DOTS EXTENDED_GLOB CORRECT
+
 # ── Prompt ───────────────────────────────────────────────
 command -v starship &> /dev/null && eval "$(starship init zsh)"
 
 # ── fzf ──────────────────────────────────────────────────
 if command -v fzf &> /dev/null; then
-    FZF_VERSION=$(fzf --version | awk '{print $1}')
-    if [[ "$(printf '%s\n0.48.0\n' "$FZF_VERSION" | sort -V | head -1)" == "0.48.0" ]]; then
-        eval "$(fzf --zsh)"
+    # fzf >= 0.48 supports `--zsh`; try it directly instead of forking
+    # fzf+awk+sort to compare versions. Older fzf exits non-zero — fall
+    # back to the distro-packaged scripts.
+    if _zconfig_fzf_init="$(fzf --zsh 2> /dev/null)"; then
+        eval "$_zconfig_fzf_init"
+        unset _zconfig_fzf_init
     elif [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
         source /usr/share/doc/fzf/examples/key-bindings.zsh
         [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && \
@@ -61,8 +69,20 @@ bindkey '^[f'     forward-word        # Option+F
 bindkey '^[[3~'   delete-char         # Forward delete
 
 # ── Completion ───────────────────────────────────────────
-autoload -Uz compinit && compinit
+# Full compinit (with compaudit security scan) at most once a day; -C trusts
+# the existing dump otherwise. (#qN.mh+24) = glob qualifier: nullglob, dump
+# file modified more than 24 hours ago.
+autoload -Uz compinit
+if [[ -n ~/.zcompdump(#qN.mh+24) || ! -f ~/.zcompdump ]]; then
+    compinit
+    touch ~/.zcompdump   # compinit skips the rewrite when unchanged — bump
+                         # mtime ourselves or this branch runs every shell
+else
+    compinit -C
+fi
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
 
-# ── Shell options ────────────────────────────────────────
-setopt AUTO_CD GLOB_DOTS EXTENDED_GLOB CORRECT
+# ── Machine-local overrides (not committed) ──────────────
+# Last so it can override anything above — same pattern as
+# ~/.gitconfig.local and ~/.ssh/config.local.
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

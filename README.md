@@ -16,13 +16,21 @@ Cross-platform dotfiles for macOS and Linux. One command bootstraps a complete d
 
 ## Quick start
 
+One command on a fresh machine — clones to `~/.zconfig`, installs Homebrew if missing (macOS), prompts for your git identity, and runs the full install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ZekeWeng/Zconfig/main/bootstrap.sh | bash
+```
+
+Corp profile: `ZCONFIG_PROFILE=corp curl -fsSL ... | bash`. Or clone manually:
+
 ```bash
 git clone https://github.com/ZekeWeng/Zconfig.git ~/.zconfig
 cd ~/.zconfig && make install
 exec zsh
 ```
 
-macOS prereqs: `xcode-select --install` and Homebrew. Run `make` (no args) for the menu.
+macOS prereq: `xcode-select --install` (git). Run `make` (no args) for the menu.
 
 | Target | What it does |
 |---|---|
@@ -35,8 +43,10 @@ Develop with `make check` (syntax) and `make lint` (shellcheck).
 
 ## Customize
 
-- **Identity** — first install seeds `.env` from `.env.example`. Set your name and email there; they render into `~/.gitconfig.local` and SSH config.
+- **Identity** — first install prompts for your git name/email (skippable) and stores them in `.env` (gitignored); they render into `~/.gitconfig.local` and SSH config. Edit `.env` and re-run anytime.
+- **Machine-local overrides** — `~/.zshrc.local`, `~/.gitconfig.local`, and `~/.ssh/config.local` are sourced/included but never committed. Extra brew packages go in `platform/mac/Brewfile.local` (gitignored).
 - **Live edits** — configs are symlinked, so editing `~/.zconfig/...` applies on the next shell.
+- **Existing dotfiles** — anything the installer would replace is moved aside to `<file>.bak.<timestamp>`, never overwritten.
 - **Corp environments** — `make install-corp` links 4 dotfiles (`.zshrc`, `.zshenv`, `.tmux.conf`, `starship.toml`) and, on macOS with Homebrew available, runs `brew bundle --file=platform/mac/Brewfile.corp` (essentials + fonts only). No languages, no DB/infra, no AI casks, no VSCode/Claude Code direct downloads, no SSH key, no `~/.gitconfig`, no nvim config, no pre-commit. On Linux, corp does symlinks only.
 
 ---

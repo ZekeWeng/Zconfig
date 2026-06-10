@@ -35,6 +35,14 @@ log_info "Starting dotfiles installation..."
 ensure_env_file       "$ZCONFIG_DIR"
 load_env              "$ZCONFIG_DIR/.env"
 
+# Treat untouched .env.example placeholders as unset so we never bake
+# "Name <email@example.com>" into ~/.gitconfig.local or the SSH key.
+[[ "${GIT_USER_NAME:-}" == "Name" ]] && unset GIT_USER_NAME
+[[ "${GIT_USER_EMAIL:-}" == "email@example.com" ]] && unset GIT_USER_EMAIL
+if [[ -z "${GIT_USER_NAME:-}" && -z "${GIT_USER_EMAIL:-}" ]]; then
+    log_info "Git identity not set — edit $ZCONFIG_DIR/.env and re-run to render ~/.gitconfig.local"
+fi
+
 # Corp profile: terminal styling (zsh + starship + tmux) + a lean brew bundle
 # (essentials + fonts, no languages/DB/AI casks). No SSH key, no gitconfig
 # identity, no VSCode/Claude Code direct downloads, no lazy.nvim, no pre-commit.

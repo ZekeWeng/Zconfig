@@ -30,6 +30,11 @@ if [[ "$INSTALL_BREW" == true ]]; then
     if command -v brew &> /dev/null; then
         log_info "Installing Homebrew packages..."
         brew bundle --file="$ZCONFIG_DIR/platform/mac/Brewfile"
+        # Machine-local additions — gitignored, same pattern as ~/.zshrc.local.
+        if [[ -f "$ZCONFIG_DIR/platform/mac/Brewfile.local" ]]; then
+            log_info "Installing local Homebrew packages (Brewfile.local)..."
+            brew bundle --file="$ZCONFIG_DIR/platform/mac/Brewfile.local"
+        fi
     else
         log_err "Homebrew not found. Install Homebrew first: https://brew.sh"
         exit 1

@@ -69,6 +69,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
         log_info "Updating Homebrew..."
         brew update && brew upgrade && brew cleanup --prune=all
         [[ -f "$ZCONFIG_DIR/platform/mac/Brewfile" ]] && brew bundle --file="$ZCONFIG_DIR/platform/mac/Brewfile"
+        [[ -f "$ZCONFIG_DIR/platform/mac/Brewfile.local" ]] && brew bundle --file="$ZCONFIG_DIR/platform/mac/Brewfile.local"
         log_ok "  Homebrew up to date"
         recap_add "Homebrew: updated packages, casks, and cleanup"
     else
