@@ -9,6 +9,7 @@ are guarded by ``dry_run`` so a read-only run never changes the machine.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -126,12 +127,31 @@ class Engine:
 
     # ── status ────────────────────────────────────────────────────────
 
-    def status(self, tags: set[str] | None = None) -> Outcome:
+    def status(self, tags: set[str] | None = None, *, as_json: bool = False) -> Outcome:
         manifest = self.manifest_store.load()
         lock = self.lock_store.load()
         tools = self._resolved(tags)
         results = self._assess(tools, lock)
         orphans = find_orphans(manifest, lock)
+
+        if as_json:
+            # Pure JSON on stdout (no color, no summary chrome) so it pipes cleanly.
+            payload = [_assessment_dict(a) for a in sorted(results, key=lambda a: a.name)]
+            payload += [
+                {
+                    "name": o.name,
+                    "manager": o.manager,
+                    "package": o.package,
+                    "status": Status.ORPHAN.value,
+                    "current": o.version,
+                    "latest": None,
+                    "desired": None,
+                    "pinned": o.pinned,
+                }
+                for o in sorted(orphans, key=lambda e: e.name)
+            ]
+            print(json.dumps(payload, indent=2))
+            return Outcome()
 
         rows = [
             [a.name, a.manager, a.status.value, a.current or "-", _want(a)]
@@ -478,7 +498,7 @@ class Engine:
 
     # ── why ───────────────────────────────────────────────────────────
 
-    def why(self, name: str) -> Outcome:
+    def why(self, name: str, *, as_json: bool = False) -> Outcome:
         """Explain how a tool resolves on this platform and its live state."""
         manifest = self.manifest_store.load()
         tool = manifest.get(name)
@@ -486,45 +506,90 @@ class Engine:
             self.console.error(f"{name} is not in the manifest.")
             return Outcome(ok=False)
 
-        self.console.info(name)
-        self.console.info(f"  declared platforms : {', '.join(tool.platforms)}")
-        self.console.info(f"  tags               : {', '.join(tool.tags) or '-'}")
+        report = self._build_why(tool, name)
+        if as_json:
+            print(json.dumps(report, indent=2))
+        else:
+            self._render_why(report)
+        return Outcome()
 
+    def _build_why(self, tool: Tool, name: str) -> dict:
+        report: dict = {
+            "name": name,
+            "platform": self.platform,
+            "declared_platforms": list(tool.platforms),
+            "tags": list(tool.tags),
+            "targeted": False,
+            "resolved": None,
+            "state": None,
+            "lock": None,
+        }
         resolved = tool.resolve(self.platform)
         if resolved is None:
-            self.console.warn(f"  not targeted on this platform ({self.platform}) — skipped by sync/status")
-            return Outcome()
-
-        applied = " (override applied)" if self.platform in tool.overrides else ""
-        self.console.info(f"  resolved for {self.platform}{applied}:")
-        self.console.info(f"    manager : {resolved.manager}")
-        self.console.info(f"    package : {resolved.package}")
-        pin = " (pinned)" if resolved.is_pinned else ""
-        self.console.info(f"    version : {resolved.version}{pin}")
-        if resolved.options:
-            self.console.info(f"    options : {resolved.options}")
-        if resolved.env:
-            self.console.info(f"    env     : {resolved.env}")
-
+            return report
+        report["targeted"] = True
+        report["resolved"] = {
+            "manager": resolved.manager,
+            "package": resolved.package,
+            "version": resolved.version,
+            "pinned": resolved.is_pinned,
+            "override_applied": self.platform in tool.overrides,
+            "options": dict(resolved.options),
+            "env": dict(resolved.env),
+        }
         manager = self.managers.get(resolved.manager)
+        entry = self.lock_store.load().get(name)
         if manager is None:
-            self.console.warn(f"    state   : unknown manager '{resolved.manager}'")
+            report["state"] = {"error": f"unknown manager '{resolved.manager}'"}
         elif not manager.is_available():
-            self.console.warn(f"    state   : manager '{resolved.manager}' not available here")
+            report["state"] = {"error": f"manager '{resolved.manager}' not available here"}
         else:
-            entry = self.lock_store.load().get(name)
             obs = manager.observe(resolved)
-            verdict = assess(resolved, obs, entry is not None)
-            self.console.info(f"    status  : {verdict.status.value}")
-            self.console.info(f"    current : {obs.current or '-'}")
-            if obs.latest:
-                self.console.info(f"    latest  : {obs.latest}")
-            if entry:
-                held = " (pinned)" if entry.pinned else ""
-                self.console.info(f"    lock    : installed by zconfig {entry.installed_at}{held}")
-            else:
-                self.console.info("    lock    : not recorded — zconfig won't auto-remove it")
-        return Outcome()
+            report["state"] = {
+                "status": assess(resolved, obs, entry is not None).status.value,
+                "current": obs.current,
+                "latest": obs.latest,
+            }
+        report["lock"] = (
+            {"installed_by_zconfig": True, "installed_at": entry.installed_at, "pinned": entry.pinned}
+            if entry
+            else {"installed_by_zconfig": False}
+        )
+        return report
+
+    def _render_why(self, report: dict) -> None:
+        self.console.info(report["name"])
+        self.console.info(f"  declared platforms : {', '.join(report['declared_platforms'])}")
+        self.console.info(f"  tags               : {', '.join(report['tags']) or '-'}")
+        if not report["targeted"]:
+            self.console.warn(
+                f"  not targeted on this platform ({report['platform']}) — skipped by sync/status"
+            )
+            return
+        r = report["resolved"]
+        applied = " (override applied)" if r["override_applied"] else ""
+        self.console.info(f"  resolved for {report['platform']}{applied}:")
+        self.console.info(f"    manager : {r['manager']}")
+        self.console.info(f"    package : {r['package']}")
+        self.console.info(f"    version : {r['version']}{' (pinned)' if r['pinned'] else ''}")
+        if r["options"]:
+            self.console.info(f"    options : {r['options']}")
+        if r["env"]:
+            self.console.info(f"    env     : {r['env']}")
+        state = report["state"]
+        if "error" in state:
+            self.console.warn(f"    state   : {state['error']}")
+        else:
+            self.console.info(f"    status  : {state['status']}")
+            self.console.info(f"    current : {state['current'] or '-'}")
+            if state["latest"]:
+                self.console.info(f"    latest  : {state['latest']}")
+        lock = report["lock"]
+        if lock["installed_by_zconfig"]:
+            held = " (pinned)" if lock["pinned"] else ""
+            self.console.info(f"    lock    : installed by zconfig {lock['installed_at']}{held}")
+        else:
+            self.console.info("    lock    : not recorded — zconfig won't auto-remove it")
 
     # ── doctor ────────────────────────────────────────────────────────
 
@@ -665,3 +730,16 @@ def _want(a: Assessment) -> str:
     if a.pinned:
         return f"={a.desired_version}"
     return a.latest or a.desired_version
+
+
+def _assessment_dict(a: Assessment) -> dict:
+    return {
+        "name": a.name,
+        "manager": a.manager,
+        "package": a.package,
+        "status": a.status.value,
+        "current": a.current,
+        "latest": a.latest,
+        "desired": a.desired_version,
+        "pinned": a.pinned,
+    }

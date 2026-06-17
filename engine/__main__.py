@@ -144,7 +144,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     with_common(sub.add_parser("bootstrap", help="install prerequisites then sync"))
     with_common(sub.add_parser("sync", help="converge the machine to the manifest"))
-    with_common(sub.add_parser("status", help="show drift vs the manifest"), yes=False, dry=False)
+    p_status = with_common(sub.add_parser("status", help="show drift vs the manifest"), yes=False, dry=False)
+    p_status.add_argument("--json", action="store_true", help="emit JSON on stdout instead of a table")
     with_common(sub.add_parser("update", help="interactively update outdated tools"), yes=False)
     with_common(sub.add_parser("doctor", help="check environment health"), tags=False, yes=False, dry=False)
 
@@ -178,6 +179,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_why = sub.add_parser("why", help="explain how a tool resolves and its live state")
     p_why.add_argument("name")
+    p_why.add_argument("--json", action="store_true", help="emit JSON on stdout")
     return parser
 
 
@@ -194,7 +196,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.command == "status":
-        return 0 if engine.status(_tags(args.tags)).ok else 1
+        return 0 if engine.status(_tags(args.tags), as_json=args.json).ok else 1
     if args.command == "sync":
         return 0 if engine.sync(_tags(args.tags), assume_yes=args.yes).ok else 1
     if args.command == "bootstrap":
@@ -214,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "config":
         return 0 if engine.config(args.action, args.key, args.value).ok else 1
     if args.command == "why":
-        return 0 if engine.why(args.name).ok else 1
+        return 0 if engine.why(args.name, as_json=args.json).ok else 1
     console.error(f"unknown command: {args.command}")
     return 2
 
