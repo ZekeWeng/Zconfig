@@ -8,6 +8,9 @@ are guarded by ``dry_run`` so a read-only run never changes the machine.
 
 from __future__ import annotations
 
+import contextlib
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from .domain import (
@@ -207,27 +210,30 @@ class Engine:
 
         verb = "Installing" if action == "install" else "Updating"
         self.console.info(f"{verb} {tool.name} ({tool.manager}:{tool.package})...")
-        if not self._run_hook(tool.pre_install, tool.name):
-            return False
+        # Per-tool env (the [tools.<name>.env] table) is applied for the whole
+        # provisioning span, so the manager subprocess and both hooks inherit it.
+        with _apply_env(tool.env):
+            if not self._run_hook(tool.pre_install, tool.name):
+                return False
 
-        result = manager.install(tool) if action == "install" else manager.update(tool)
-        if not result.ok:
-            self.console.error(f"  {tool.name} failed: {result.stderr.strip() or result.code}")
-            return False
-        if result.stderr.strip():
-            self.console.info(f"  note: {result.stderr.strip()}")
+            result = manager.install(tool) if action == "install" else manager.update(tool)
+            if not result.ok:
+                self.console.error(f"  {tool.name} failed: {result.stderr.strip() or result.code}")
+                return False
+            if result.stderr.strip():
+                self.console.info(f"  note: {result.stderr.strip()}")
 
-        if tool.is_pinned:
-            manager.pin(tool)
+            if tool.is_pinned:
+                manager.pin(tool)
 
-        if self.dry_run:
-            return True
+            if self.dry_run:
+                return True
 
-        if not manager.is_installed(tool):
-            self.console.error(f"  {tool.name}: install reported success but tool is still missing")
-            return False
-        if not self._run_hook(tool.post_install, tool.name):
-            return False
+            if not manager.is_installed(tool):
+                self.console.error(f"  {tool.name}: install reported success but tool is still missing")
+                return False
+            if not self._run_hook(tool.post_install, tool.name):
+                return False
         self.console.ok(f"  {tool.name} ok")
         return True
 
@@ -513,6 +519,28 @@ class Engine:
         if self.dry_run:
             return
         self.lock_store.save(lock)
+
+
+@contextlib.contextmanager
+def _apply_env(env: Mapping[str, str]):
+    """Temporarily overlay ``env`` onto os.environ, restoring it on exit.
+
+    The shell runner merges os.environ into every subprocess, so setting it here
+    is how a tool's [env] table reaches both its manager command and its hooks.
+    """
+    if not env:
+        yield
+        return
+    saved = {key: os.environ.get(key) for key in env}
+    os.environ.update({key: str(value) for key, value in env.items()})
+    try:
+        yield
+    finally:
+        for key, previous in saved.items():
+            if previous is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = previous
 
 
 def _want(a: Assessment) -> str:

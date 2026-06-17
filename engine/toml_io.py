@@ -103,6 +103,7 @@ def _parse_tool(name: str, body: dict) -> Tool:
         pre_install=_opt(body.get("pre_install")),
         post_install=_opt(body.get("post_install")),
         options=dict(body.get("options", {})),
+        env={str(k): str(v) for k, v in body.get("env", {}).items()},
         overrides=overrides,
     )
 
@@ -132,13 +133,17 @@ def _render_tool(tool: Tool) -> str:
 
     if tool.options:
         block += f"\n\n[{head}.options]\n" + _render_table(tool.options)
+    if tool.env:
+        block += f"\n\n[{head}.env]\n" + _render_table(tool.env)
     for plat in sorted(tool.overrides):
         over = tool.overrides[plat]
-        nested = {k: v for k, v in over.items() if k != "options"}
+        nested = {k: v for k, v in over.items() if k not in ("options", "env")}
         if nested:
             block += f"\n\n[{head}.overrides.{_key(plat)}]\n" + _render_table(nested)
         if over.get("options"):
             block += f"\n\n[{head}.overrides.{_key(plat)}.options]\n" + _render_table(over["options"])
+        if over.get("env"):
+            block += f"\n\n[{head}.overrides.{_key(plat)}.env]\n" + _render_table(over["env"])
     return block + "\n"
 
 

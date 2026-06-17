@@ -51,6 +51,7 @@ class Tool:
     pre_install: str | None = None
     post_install: str | None = None
     options: dict[str, object] = field(default_factory=dict)
+    env: dict[str, str] = field(default_factory=dict)
     overrides: dict[str, dict[str, object]] = field(default_factory=dict)
 
     @property
@@ -78,6 +79,7 @@ class Tool:
             pre_install=_opt_str(over.get("pre_install", self.pre_install)),
             post_install=_opt_str(over.get("post_install", self.post_install)),
             options={**self.options, **over.get("options", {})},
+            env={**self.env, **over.get("env", {})},
         )
 
 
@@ -93,6 +95,7 @@ class ResolvedTool:
     pre_install: str | None
     post_install: str | None
     options: dict[str, object]
+    env: dict[str, str] = field(default_factory=dict)
 
     @property
     def is_pinned(self) -> bool:
