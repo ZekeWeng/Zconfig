@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import tomllib
 from pathlib import Path
 
 from . import __version__
@@ -201,7 +202,18 @@ def main(argv: list[str] | None = None) -> int:
 
     engine = _build_engine(args)
     console = engine.console
+    try:
+        return _dispatch(engine, args, console)
+    except tomllib.TOMLDecodeError as exc:
+        # A typo in software.toml is common — give a clear error, not a traceback.
+        console.error(f"{engine.manifest_store.path}: invalid TOML — {exc}")
+        return 1
+    except OSError as exc:
+        console.error(f"file error: {exc}")
+        return 1
 
+
+def _dispatch(engine: Engine, args: argparse.Namespace, console: TerminalConsole) -> int:
     if args.command == "add":
         return _cmd_add(engine, args)
 

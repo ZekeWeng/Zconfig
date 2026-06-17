@@ -313,6 +313,23 @@ class JsonOutputTests(unittest.TestCase):
         self.assertEqual([t["name"] for t in core], ["a"])
 
 
+class CliBoundaryTests(unittest.TestCase):
+    def test_malformed_toml_exits_clean_not_traceback(self):
+        import contextlib
+        import io
+
+        from engine.__main__ import main
+
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        path.write_text("[tools.broken\n")  # missing ]
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code = main(["--manifest", str(path), "--lock", tempfile.mktemp(), "status"])
+        self.assertEqual(code, 1)
+        self.assertIn("invalid TOML", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
+
+
 class CompletionTests(unittest.TestCase):
     def test_bash_script_registers_and_completes_tool_args(self):
         from engine.completion import completion_script
