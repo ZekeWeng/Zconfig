@@ -182,6 +182,48 @@ class Engine:
         if counts.get(Status.MISSING.value) or counts.get(Status.PIN_DRIFT.value) or orphans:
             self.console.info("Run `zconfig sync` to converge to the manifest.")
 
+    # ── list ──────────────────────────────────────────────────────────
+
+    def list_tools(self, tags: set[str] | None = None, *, as_json: bool = False) -> Outcome:
+        """Inventory the declared manifest (all platforms) without probing the
+        machine — fast, unlike `status`. Good for "what do I manage?"."""
+        manifest = self.manifest_store.load()
+        if tags is None and manifest.settings.default_tags:
+            tags = set(manifest.settings.default_tags)
+        tools = sorted(manifest.tools, key=lambda t: t.name)
+        if tags:
+            tools = [t for t in tools if tags & set(t.tags)]
+
+        if as_json:
+            print(
+                json.dumps(
+                    [
+                        {
+                            "name": t.name,
+                            "manager": t.manager,
+                            "package": t.package,
+                            "version": t.version,
+                            "platforms": list(t.platforms),
+                            "tags": list(t.tags),
+                        }
+                        for t in tools
+                    ],
+                    indent=2,
+                )
+            )
+            return Outcome()
+
+        if not tools:
+            self.console.info("No tools match.")
+            return Outcome()
+        rows = [
+            [t.name, t.manager, t.version, ",".join(t.platforms), ",".join(t.tags) or "-"]
+            for t in tools
+        ]
+        self.console.table(["TOOL", "MANAGER", "VERSION", "PLATFORMS", "TAGS"], rows)
+        self.console.info(f"{len(tools)} tool(s).")
+        return Outcome()
+
     # ── sync ──────────────────────────────────────────────────────────
 
     def sync(self, tags: set[str] | None = None, *, assume_yes: bool = False) -> Outcome:

@@ -144,6 +144,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     with_common(sub.add_parser("bootstrap", help="install prerequisites then sync"))
     with_common(sub.add_parser("sync", help="converge the machine to the manifest"))
+    p_list = with_common(sub.add_parser("list", help="list declared tools (no live probing)"), yes=False, dry=False)
+    p_list.add_argument("--json", action="store_true", help="emit JSON on stdout instead of a table")
+
     p_status = with_common(sub.add_parser("status", help="show drift vs the manifest"), yes=False, dry=False)
     p_status.add_argument("--json", action="store_true", help="emit JSON on stdout instead of a table")
     with_common(sub.add_parser("update", help="interactively update outdated tools"), yes=False)
@@ -195,6 +198,8 @@ def main(argv: list[str] | None = None) -> int:
     if not _require_manifest(engine, console):
         return 1
 
+    if args.command == "list":
+        return 0 if engine.list_tools(_tags(args.tags), as_json=args.json).ok else 1
     if args.command == "status":
         return 0 if engine.status(_tags(args.tags), as_json=args.json).ok else 1
     if args.command == "sync":
