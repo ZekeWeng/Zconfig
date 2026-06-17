@@ -329,6 +329,16 @@ class CliBoundaryTests(unittest.TestCase):
         self.assertIn("invalid TOML", err.getvalue())
         self.assertNotIn("Traceback", err.getvalue())
 
+    def test_log_file_is_private(self):
+        import os
+        import stat
+
+        from engine.__main__ import _FileLog
+
+        path = Path(tempfile.mktemp())
+        _FileLog(path, "test")
+        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+
 
 class ScriptSafetyTests(unittest.TestCase):
     def test_default_check_quotes_package_name(self):

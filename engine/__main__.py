@@ -8,6 +8,7 @@ dispatches to the application layer. Keep wiring here — not in services.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 import tomllib
@@ -34,7 +35,12 @@ class _FileLog:
     def __init__(self, path: Path, command: str) -> None:
         self.path = path
         try:
+            # 0600: the log mirrors console output (including hook command
+            # strings on failure, which may carry secrets) and is personal
+            # machine state — no reason for group/other to read it.
             self.handle = path.open("a", encoding="utf-8")
+            with contextlib.suppress(OSError):
+                os.chmod(path, 0o600)
             self.handle.write(f"\n=== zconfig {command} @ {SystemClock().now_iso()} ===\n")
         except OSError:
             self.handle = None
