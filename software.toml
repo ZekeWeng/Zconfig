@@ -1,0 +1,300 @@
+# software.toml — the single source of truth for every tool zconfig manages.
+#
+# Each [tools.<name>] block declares one piece of software. Fields:
+#   manager      brew | apt | cargo | npm | pnpm | pipx | go | script | manual
+#   package      the package/identifier the manager installs
+#   version      "latest" (track upstream) or an exact pin e.g. "14.1.0"
+#   platforms    where it applies: any of ["macos", "linux", "wsl"]
+#   tags         freeform groups for subset installs e.g. ["core", "dev"]
+#   pre_install / post_install   optional shell hooks (post doubles as a health check)
+#
+# Per-platform overrides (different package/manager per OS) go in a sub-table:
+#   [tools.fd.overrides.linux]
+#   manager = "apt"
+#   package = "fd-find"
+#
+# On Linux, tools with a bespoke pinned installer delegate to it via the
+# `script` manager: install = "... run_installer <name>" — this is how the
+# manifest coexists with the repo's existing installers instead of replacing
+# how they work. macOS installs come from Homebrew (the Brewfile remains the
+# brew reference; the brew adapter shells out to it).
+#
+# Heads up: `zconfig add/pin/remove` regenerate this file alphabetically and do
+# not preserve the section comments below.
+
+# ── Shell & prompt ───────────────────────────────────────────────────
+[tools.zsh]
+manager = "brew"
+package = "zsh"
+platforms = ["macos", "linux"]
+tags = ["shell", "core"]
+[tools.zsh.overrides.linux]
+manager = "apt"
+package = "zsh"
+
+[tools.starship]
+manager = "brew"
+package = "starship"
+platforms = ["macos", "linux"]
+tags = ["shell", "core"]
+post_install = "starship --version"
+[tools.starship.overrides.linux]
+manager = "script"
+[tools.starship.overrides.linux.options]
+check = "command -v starship"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer starship"
+
+# ── Terminal ─────────────────────────────────────────────────────────
+[tools.tmux]
+manager = "brew"
+package = "tmux"
+platforms = ["macos", "linux"]
+tags = ["terminal", "core"]
+[tools.tmux.overrides.linux]
+manager = "apt"
+package = "tmux"
+
+# ── Editors ──────────────────────────────────────────────────────────
+[tools.neovim]
+manager = "brew"
+package = "neovim"
+platforms = ["macos", "linux"]
+tags = ["editor", "core"]
+post_install = "nvim --version"
+[tools.neovim.overrides.linux]
+manager = "script"
+[tools.neovim.overrides.linux.options]
+check = "command -v nvim"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer neovim"
+
+[tools.vscode]
+manager = "script"
+package = "vscode"
+platforms = ["macos", "linux"]
+tags = ["editor"]
+post_install = "code --version"
+[tools.vscode.options]
+check = "command -v code"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer vscode"
+
+[tools.tree-sitter]
+manager = "brew"
+package = "tree-sitter-cli"
+platforms = ["macos", "linux"]
+tags = ["editor", "dev"]
+[tools.tree-sitter.options]
+binary = "tree-sitter"
+[tools.tree-sitter.overrides.linux]
+manager = "script"
+[tools.tree-sitter.overrides.linux.options]
+check = "command -v tree-sitter"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer tree-sitter"
+
+# ── Version control ──────────────────────────────────────────────────
+[tools.git]
+manager = "brew"
+package = "git"
+platforms = ["macos", "linux"]
+tags = ["vcs", "core"]
+[tools.git.overrides.linux]
+manager = "apt"
+package = "git"
+
+[tools.lazygit]
+manager = "brew"
+package = "lazygit"
+platforms = ["macos", "linux"]
+tags = ["vcs", "cli"]
+[tools.lazygit.overrides.linux]
+manager = "script"
+[tools.lazygit.overrides.linux.options]
+check = "command -v lazygit"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer lazygit"
+
+[tools.gh]
+manager = "brew"
+package = "gh"
+platforms = ["macos", "linux"]
+tags = ["vcs", "cli"]
+post_install = "gh --version"
+[tools.gh.overrides.linux]
+manager = "script"
+[tools.gh.overrides.linux.options]
+check = "command -v gh"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer gh"
+
+# ── CLI utilities ────────────────────────────────────────────────────
+[tools.ripgrep]
+manager = "brew"
+package = "ripgrep"
+platforms = ["macos", "linux"]
+tags = ["cli", "core"]
+post_install = "rg --version"
+[tools.ripgrep.overrides.linux]
+manager = "apt"
+package = "ripgrep"
+
+[tools.fd]
+manager = "brew"
+package = "fd"
+platforms = ["macos", "linux"]
+tags = ["cli", "core"]
+[tools.fd.overrides.linux]
+manager = "apt"
+package = "fd-find"
+
+[tools.fzf]
+manager = "brew"
+package = "fzf"
+platforms = ["macos", "linux"]
+tags = ["cli", "core"]
+[tools.fzf.overrides.linux]
+manager = "apt"
+package = "fzf"
+
+[tools.eza]
+manager = "brew"
+package = "eza"
+platforms = ["macos", "linux"]
+tags = ["cli", "core"]
+[tools.eza.overrides.linux]
+manager = "script"
+[tools.eza.overrides.linux.options]
+check = "command -v eza"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer eza"
+
+[tools.shellcheck]
+manager = "brew"
+package = "shellcheck"
+platforms = ["macos", "linux"]
+tags = ["dev"]
+[tools.shellcheck.overrides.linux]
+manager = "apt"
+package = "shellcheck"
+
+# ── AI tooling ───────────────────────────────────────────────────────
+[tools.claude-code]
+manager = "script"
+package = "claude-code"
+platforms = ["macos", "linux"]
+tags = ["ai"]
+post_install = "claude --version"
+[tools.claude-code.options]
+check = "command -v claude"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer claude-code"
+
+[tools.codex]
+manager = "brew"
+package = "codex"
+platforms = ["macos", "linux"]
+tags = ["ai"]
+[tools.codex.options]
+cask = true
+[tools.codex.overrides.linux]
+manager = "script"
+[tools.codex.overrides.linux.options]
+check = "command -v codex"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer codex"
+
+[tools.claude-desktop]
+manager = "brew"
+package = "claude"
+platforms = ["macos"]
+tags = ["ai"]
+[tools.claude-desktop.options]
+cask = true
+
+# ── Languages & toolchains ───────────────────────────────────────────
+[tools.node]
+manager = "brew"
+package = "node@22"
+platforms = ["macos", "linux"]
+tags = ["lang", "dev"]
+[tools.node.overrides.linux]
+manager = "apt"
+package = "nodejs"
+
+[tools.python]
+manager = "brew"
+package = "python@3.13"
+platforms = ["macos", "linux"]
+tags = ["lang", "dev"]
+[tools.python.overrides.linux]
+manager = "apt"
+package = "python3"
+
+[tools.uv]
+manager = "brew"
+package = "uv"
+platforms = ["macos", "linux"]
+tags = ["lang", "dev"]
+post_install = "uv --version"
+[tools.uv.overrides.linux]
+manager = "script"
+[tools.uv.overrides.linux.options]
+check = "command -v uv"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer uv"
+
+[tools.go]
+manager = "brew"
+package = "go"
+platforms = ["macos", "linux"]
+tags = ["lang", "dev"]
+[tools.go.overrides.linux]
+manager = "apt"
+package = "golang-go"
+
+# Rust and Elixir ship via brew on macOS only; the Linux installer does not
+# provision them, so they are scoped to macos to avoid false drift on Linux.
+[tools.rust]
+manager = "brew"
+package = "rust"
+platforms = ["macos"]
+tags = ["lang", "dev"]
+
+[tools.elixir]
+manager = "brew"
+package = "elixir"
+platforms = ["macos"]
+tags = ["lang", "dev"]
+
+# ── Databases & infrastructure (macOS) ───────────────────────────────
+[tools.postgresql]
+manager = "brew"
+package = "postgresql@15"
+platforms = ["macos"]
+tags = ["db"]
+
+[tools.rabbitmq]
+manager = "brew"
+package = "rabbitmq"
+platforms = ["macos"]
+tags = ["db"]
+
+[tools.awscli]
+manager = "brew"
+package = "awscli"
+platforms = ["macos"]
+tags = ["infra", "cli"]
+
+# ── Fonts ────────────────────────────────────────────────────────────
+[tools.nerd-font-jetbrains]
+manager = "brew"
+package = "font-jetbrains-mono-nerd-font"
+platforms = ["macos", "linux"]
+tags = ["font"]
+[tools.nerd-font-jetbrains.options]
+cask = true
+[tools.nerd-font-jetbrains.overrides.linux]
+manager = "script"
+[tools.nerd-font-jetbrains.overrides.linux.options]
+check = "fc-list | grep -qi 'JetBrainsMono Nerd Font'"
+install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer nerd-fonts"
+
+[tools.nerd-font-firacode]
+manager = "brew"
+package = "font-fira-code-nerd-font"
+platforms = ["macos"]
+tags = ["font"]
+[tools.nerd-font-firacode.options]
+cask = true
