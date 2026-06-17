@@ -24,6 +24,23 @@ jobs:
           # and the local pre-commit shellcheck hook (both *.sh-only).
           ignore_names: "*.zsh .zshrc .zshenv"
 
+  python-engine:
+    name: zconfig engine (ruff + compile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: python3 -m pip install --user ruff
+      - name: Lint
+        run: ~/.local/bin/ruff check engine
+      - name: Compile (stdlib only — no third-party imports)
+        run: python3 -m compileall -q engine
+      - name: Smoke-test the CLI
+        run: PYTHONPATH=. python3 -m engine --help > /dev/null
+
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest

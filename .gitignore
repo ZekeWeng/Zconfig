@@ -15,5 +15,9 @@
 # Backup snapshots
 .zconfig_backup/
 
+# zconfig engine state (per-machine; not shared)
+zconfig.lock
+.zconfig.log
+
 # Stray archives — cci alias packs ~/.zconfig/.claude/ on demand
 claude-config.tar.gz
