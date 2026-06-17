@@ -183,11 +183,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_why = sub.add_parser("why", help="explain how a tool resolves and its live state")
     p_why.add_argument("name")
     p_why.add_argument("--json", action="store_true", help="emit JSON on stdout")
+
+    p_comp = sub.add_parser("completion", help="print a shell completion script (bash|zsh)")
+    p_comp.add_argument("shell", choices=["bash", "zsh"])
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+
+    # completion needs no engine or manifest — print and exit.
+    if args.command == "completion":
+        from .completion import completion_script
+
+        print(completion_script(args.shell), end="")
+        return 0
+
     engine = _build_engine(args)
     console = engine.console
 
