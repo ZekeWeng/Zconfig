@@ -166,7 +166,13 @@ class Console(ABC):
         ...
 
     @abstractmethod
-    def table(self, headers: list[str], rows: list[list[str]]) -> None:
+    def table(
+        self,
+        headers: list[str],
+        rows: list[list[str]],
+        *,
+        highlight: dict[str, str] | None = None,
+    ) -> None:
         ...
 
     @abstractmethod

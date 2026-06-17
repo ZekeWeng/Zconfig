@@ -31,6 +31,19 @@ class Outcome:
     messages: tuple[str, ...] = ()
 
 
+# Status value -> semantic color, so `status` reads at a glance.
+_STATUS_COLORS = {
+    Status.OK.value: "green",
+    Status.PINNED.value: "green",
+    Status.MISSING.value: "red",
+    Status.PIN_DRIFT.value: "red",
+    Status.ORPHAN.value: "red",
+    Status.OUTDATED.value: "yellow",
+    Status.UNKNOWN.value: "dim",
+    Status.SKIPPED.value: "dim",
+}
+
+
 class Engine:
     def __init__(
         self,
@@ -57,6 +70,9 @@ class Engine:
 
     def _resolved(self, tags: set[str] | None) -> tuple[ResolvedTool, ...]:
         manifest = self.manifest_store.load()
+        # No explicit --tags falls back to the manifest's default_tags (empty = all).
+        if tags is None and manifest.settings.default_tags:
+            tags = set(manifest.settings.default_tags)
         tools = manifest.for_platform(self.platform)
         if tags:
             tools = tuple(t for t in tools if tags & set(t.tags))
@@ -121,7 +137,9 @@ class Engine:
         if not rows:
             self.console.info("No tools declared for this platform.")
             return Outcome()
-        self.console.table(["TOOL", "MANAGER", "STATUS", "CURRENT", "WANT"], rows)
+        self.console.table(
+            ["TOOL", "MANAGER", "STATUS", "CURRENT", "WANT"], rows, highlight=_STATUS_COLORS
+        )
         self._print_drift_summary(results, orphans)
         return Outcome()
 

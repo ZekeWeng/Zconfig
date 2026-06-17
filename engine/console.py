@@ -16,6 +16,9 @@ _YELLOW = "\033[1;33m"
 _DIM = "\033[2m"
 _NC = "\033[0m"
 
+# Semantic color names callers pass (so they stay free of ANSI codes).
+_NAMED = {"red": _RED, "green": _GREEN, "yellow": _YELLOW, "dim": _DIM}
+
 
 class TerminalConsole:
     def __init__(self, *, log: Callable[[str], None] | None = None, assume_yes: bool = False) -> None:
@@ -43,7 +46,17 @@ class TerminalConsole:
         print(self._paint(_RED, message), file=sys.stderr)
         self._log("ERROR: " + message)
 
-    def table(self, headers: list[str], rows: list[list[str]]) -> None:
+    def table(
+        self,
+        headers: list[str],
+        rows: list[list[str]],
+        *,
+        highlight: dict[str, str] | None = None,
+    ) -> None:
+        """Render an aligned table. ``highlight`` maps a cell's exact text to a
+        semantic color name (red/green/yellow/dim); coloring is applied after
+        width alignment so it never throws off column widths."""
+        highlight = highlight or {}
         widths = [len(h) for h in headers]
         for row in rows:
             for i, cell in enumerate(row):
@@ -52,7 +65,12 @@ class TerminalConsole:
         print(self._paint(_YELLOW, header_line))
         print(self._paint(_DIM, "  ".join("-" * widths[i] for i in range(len(headers)))))
         for row in rows:
-            print("  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)))
+            cells = []
+            for i, cell in enumerate(row):
+                padded = cell.ljust(widths[i])
+                color = _NAMED.get(highlight.get(cell, ""))
+                cells.append(f"{color}{padded}{_NC}" if color and self._color else padded)
+            print("  ".join(cells))
         for line in (header_line, *("  ".join(row) for row in rows)):
             self._log(line)
 

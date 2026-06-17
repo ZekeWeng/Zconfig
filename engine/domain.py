@@ -100,10 +100,23 @@ class ResolvedTool:
 
 
 @dataclass(frozen=True, slots=True)
+class Settings:
+    """Engine defaults declared in the manifest's ``[settings]`` table.
+
+    Everything here is overridable per-invocation by a CLI flag or environment
+    variable; these are just the persistent defaults a user bakes into the repo.
+    """
+
+    default_tags: tuple[str, ...] = ()
+    default_platform: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Manifest:
     """The declared desired state — the whole ``software.toml`` as domain types."""
 
     tools: tuple[Tool, ...]
+    settings: Settings = Settings()
 
     def get(self, name: str) -> Tool | None:
         return next((t for t in self.tools if t.name == name), None)
@@ -117,10 +130,10 @@ class Manifest:
 
     def with_tool(self, tool: Tool) -> Manifest:
         kept = tuple(t for t in self.tools if t.name != tool.name)
-        return Manifest(tools=kept + (tool,))
+        return Manifest(tools=kept + (tool,), settings=self.settings)
 
     def without_tool(self, name: str) -> Manifest:
-        return Manifest(tools=tuple(t for t in self.tools if t.name != name))
+        return Manifest(tools=tuple(t for t in self.tools if t.name != name), settings=self.settings)
 
 
 @dataclass(frozen=True, slots=True)

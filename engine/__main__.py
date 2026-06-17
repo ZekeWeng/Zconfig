@@ -12,6 +12,7 @@ import os
 import sys
 from pathlib import Path
 
+from . import __version__
 from .console import TerminalConsole
 from .domain import KNOWN_PLATFORMS, LATEST, Tool
 from .lockfile import JsonLockStore
@@ -57,16 +58,33 @@ def _build_engine(args: argparse.Namespace) -> Engine:
     if getattr(args, "dry_run", False):
         runner = DryRunner(runner, sink=console.info)
 
+    manifest_store = TomlManifestStore(manifest_path)
     return Engine(
-        manifest_store=TomlManifestStore(manifest_path),
+        manifest_store=manifest_store,
         lock_store=JsonLockStore(lock_path),
         managers=Registry(runner),
         runner=runner,
         console=console,
         clock=SystemClock(),
-        platform=detect_platform(),
+        platform=_resolve_platform(manifest_store),
         dry_run=getattr(args, "dry_run", False),
     )
+
+
+def _resolve_platform(store: TomlManifestStore) -> str:
+    """Precedence: $ZCONFIG_PLATFORM > manifest [settings].default_platform >
+    auto-detected. Lets a Mac plan a Linux converge, or pin a host explicitly."""
+    override = os.environ.get("ZCONFIG_PLATFORM")
+    if override:
+        return override
+    if store.exists():
+        try:
+            configured = store.load().settings.default_platform
+            if configured:
+                return configured
+        except (OSError, ValueError):
+            pass
+    return detect_platform()
 
 
 def _tags(value: str | None) -> set[str] | None:
@@ -109,6 +127,7 @@ def _cmd_add(engine: Engine, args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="zconfig", description="Declarative software management.")
+    parser.add_argument("--version", action="version", version=f"zconfig {__version__}")
     parser.add_argument("--manifest", help="path to software.toml (default: $ZCONFIG_DIR/software.toml)")
     parser.add_argument("--lock", help="path to zconfig.lock (default: $ZCONFIG_DIR/zconfig.lock)")
     parser.add_argument("--log-file", help="path to the run log (default: $ZCONFIG_DIR/.zconfig.log)")
