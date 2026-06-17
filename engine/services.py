@@ -25,6 +25,8 @@ from .domain import (
     Tool,
     assess,
     find_orphans,
+    replace_tool_version,
+    validate_manifest,
 )
 from .ports import Clock, CommandRunner, Console, LockStore, ManagerProvider, ManifestStore
 
@@ -308,7 +310,7 @@ class Engine:
                     lock = lock.upsert(self._lock_entry(tool))
             elif choice == "p":
                 pinned_version = a.current or LATEST
-                manifest = manifest.with_tool(_pin_manifest_tool(manifest, a.name, pinned_version))
+                manifest = manifest.with_tool(replace_tool_version(manifest.get(a.name), pinned_version))
                 self._save_manifest(manifest)
                 manager = self.managers.get(tool.manager)
                 if manager:
@@ -394,7 +396,7 @@ class Engine:
             if not version:
                 self.console.error(f"Cannot detect an installed version of {name}; pass one explicitly.")
                 return Outcome(ok=False)
-        manifest = manifest.with_tool(_pin_manifest_tool(manifest, name, version))
+        manifest = manifest.with_tool(replace_tool_version(manifest.get(name), version))
         self._save_manifest(manifest)
         if resolved:
             manager = self.managers.get(resolved.manager)
@@ -425,7 +427,7 @@ class Engine:
         if tool is None:
             self.console.error(f"{name} is not in the manifest.")
             return Outcome(ok=False)
-        manifest = manifest.with_tool(_pin_manifest_tool(manifest, name, LATEST))
+        manifest = manifest.with_tool(replace_tool_version(manifest.get(name), LATEST))
         self._save_manifest(manifest)
         self.console.ok(f"Unpinned {name} — it now tracks latest.")
         self.console.info("apt/brew holds are not auto-released; unhold manually if needed.")
@@ -474,17 +476,79 @@ class Engine:
         self.console.ok(f"{'Set' if action == 'set' else 'Unset'} {key}.")
         return Outcome()
 
+    # ── why ───────────────────────────────────────────────────────────
+
+    def why(self, name: str) -> Outcome:
+        """Explain how a tool resolves on this platform and its live state."""
+        manifest = self.manifest_store.load()
+        tool = manifest.get(name)
+        if tool is None:
+            self.console.error(f"{name} is not in the manifest.")
+            return Outcome(ok=False)
+
+        self.console.info(name)
+        self.console.info(f"  declared platforms : {', '.join(tool.platforms)}")
+        self.console.info(f"  tags               : {', '.join(tool.tags) or '-'}")
+
+        resolved = tool.resolve(self.platform)
+        if resolved is None:
+            self.console.warn(f"  not targeted on this platform ({self.platform}) — skipped by sync/status")
+            return Outcome()
+
+        applied = " (override applied)" if self.platform in tool.overrides else ""
+        self.console.info(f"  resolved for {self.platform}{applied}:")
+        self.console.info(f"    manager : {resolved.manager}")
+        self.console.info(f"    package : {resolved.package}")
+        pin = " (pinned)" if resolved.is_pinned else ""
+        self.console.info(f"    version : {resolved.version}{pin}")
+        if resolved.options:
+            self.console.info(f"    options : {resolved.options}")
+        if resolved.env:
+            self.console.info(f"    env     : {resolved.env}")
+
+        manager = self.managers.get(resolved.manager)
+        if manager is None:
+            self.console.warn(f"    state   : unknown manager '{resolved.manager}'")
+        elif not manager.is_available():
+            self.console.warn(f"    state   : manager '{resolved.manager}' not available here")
+        else:
+            entry = self.lock_store.load().get(name)
+            obs = manager.observe(resolved)
+            verdict = assess(resolved, obs, entry is not None)
+            self.console.info(f"    status  : {verdict.status.value}")
+            self.console.info(f"    current : {obs.current or '-'}")
+            if obs.latest:
+                self.console.info(f"    latest  : {obs.latest}")
+            if entry:
+                held = " (pinned)" if entry.pinned else ""
+                self.console.info(f"    lock    : installed by zconfig {entry.installed_at}{held}")
+            else:
+                self.console.info("    lock    : not recorded — zconfig won't auto-remove it")
+        return Outcome()
+
     # ── doctor ────────────────────────────────────────────────────────
 
     def doctor(self) -> Outcome:
         problems = 0
         self.console.info("Package managers:")
+        known = {manager.name for manager in self.managers.all()}
         for manager in self.managers.all():
             mark = "ok " if manager.is_available() else "-- "
             self.console.info(f"  [{mark}] {manager.name}")
 
         manifest = self.manifest_store.load()
         lock = self.lock_store.load()
+
+        # Static manifest validation first — unknown platforms/managers or a
+        # script tool with no install command are config errors, surfaced before
+        # we probe anything live.
+        manifest_problems = validate_manifest(manifest, known)
+        if manifest_problems:
+            self.console.error("Manifest problems:")
+            for problem in manifest_problems:
+                self.console.error(f"  {problem}")
+            problems += len(manifest_problems)
+
         tools = manifest.for_platform(self.platform)
 
         self.console.info("Declared tools on this platform:")
@@ -601,9 +665,3 @@ def _want(a: Assessment) -> str:
     if a.pinned:
         return f"={a.desired_version}"
     return a.latest or a.desired_version
-
-
-def _pin_manifest_tool(manifest: Manifest, name: str, version: str) -> Tool:
-    from dataclasses import replace
-
-    return replace(manifest.get(name), version=version)

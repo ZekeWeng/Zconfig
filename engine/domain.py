@@ -243,6 +243,33 @@ def find_orphans(manifest: Manifest, lock: Lock) -> tuple[LockEntry, ...]:
     return tuple(e for e in lock.entries if e.name not in declared)
 
 
+def validate_manifest(manifest: Manifest, known_managers: set[str]) -> list[str]:
+    """Static checks over a manifest. Pure — ``known_managers`` is passed in so
+    the domain stays unaware of the adapter registry. Returns one human-readable
+    problem string per issue (empty list = clean), for fail-fast at the boundary.
+    """
+    problems: list[str] = []
+    for t in manifest.tools:
+        for plat in t.platforms:
+            if plat not in KNOWN_PLATFORMS:
+                problems.append(f"{t.name}: unknown platform '{plat}' (known: {', '.join(KNOWN_PLATFORMS)})")
+        for plat in t.overrides:
+            if plat not in KNOWN_PLATFORMS:
+                problems.append(f"{t.name}: override targets unknown platform '{plat}'")
+        # Check the effective manager/options for every platform the tool targets.
+        for plat in t.platforms:
+            if plat not in KNOWN_PLATFORMS:
+                continue
+            resolved = t.resolve(plat)
+            if resolved is None:
+                continue
+            if resolved.manager not in known_managers:
+                problems.append(f"{t.name} ({plat}): unknown manager '{resolved.manager}'")
+            if resolved.manager == "script" and not resolved.options.get("install"):
+                problems.append(f"{t.name} ({plat}): script manager needs an options.install command")
+    return problems
+
+
 def _version_matches(installed: str, pinned: str) -> bool:
     # Tolerate a leading "v" and prefix pins (pinning "1.2" matches "1.2.3").
     a = installed.lstrip("v")
