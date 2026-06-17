@@ -22,6 +22,7 @@ from engine.domain import (
     Tool,
     assess,
     find_orphans,
+    validate_manifest,
 )
 from engine.lockfile import JsonLockStore
 from engine.ports import CommandResult, CommandRunner
@@ -171,6 +172,26 @@ class FakeRunner(CommandRunner):
 
     def which(self, program):
         return "/usr/bin/" + program
+
+
+class ValidateTests(unittest.TestCase):
+    KNOWN = {"brew", "apt", "script"}
+
+    def test_clean_manifest_has_no_problems(self):
+        m = Manifest(tools=(tool(platforms=("macos",), tags=("core",)),))
+        self.assertEqual(validate_manifest(m, self.KNOWN), [])
+
+    def test_unknown_platform_flagged(self):
+        m = Manifest(tools=(tool(platforms=("plan9",)),))
+        self.assertTrue(any("plan9" in p for p in validate_manifest(m, self.KNOWN)))
+
+    def test_unknown_manager_flagged(self):
+        m = Manifest(tools=(tool(manager="nosuch", platforms=("macos",)),))
+        self.assertTrue(any("unknown manager" in p for p in validate_manifest(m, self.KNOWN)))
+
+    def test_script_without_install_flagged(self):
+        m = Manifest(tools=(tool(manager="script", platforms=("macos",)),))
+        self.assertTrue(any("install command" in p for p in validate_manifest(m, self.KNOWN)))
 
 
 class AtomicWriteTests(unittest.TestCase):
