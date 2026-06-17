@@ -19,6 +19,8 @@ in its ``install`` option and leaves the tool untouched for the user to handle.
 
 from __future__ import annotations
 
+import shlex
+
 from ..domain import ResolvedTool
 from ..ports import CommandResult, PackageManager
 from . import register
@@ -40,7 +42,10 @@ class ScriptManager(PackageManager):
         return self.runner.which("bash") is not None
 
     def is_installed(self, tool: ResolvedTool) -> bool:
-        check = self._opt(tool, "check") or f"command -v {tool.package}"
+        # Quote the package in the auto-generated default check: a plain data
+        # field must not become shell code (an explicit `check` option is the
+        # documented place for intentional shell).
+        check = self._opt(tool, "check") or f"command -v {shlex.quote(tool.package)}"
         return self.runner.run(_bash(check), read_only=True).ok
 
     def installed_version(self, tool: ResolvedTool) -> str | None:

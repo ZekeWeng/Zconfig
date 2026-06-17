@@ -330,6 +330,25 @@ class CliBoundaryTests(unittest.TestCase):
         self.assertNotIn("Traceback", err.getvalue())
 
 
+class ScriptSafetyTests(unittest.TestCase):
+    def test_default_check_quotes_package_name(self):
+        from engine.managers.script import ScriptManager
+
+        runner = FakeRunner()
+        evil = tool(
+            name="evil",
+            manager="script",
+            package="x; touch /tmp/pwned",
+            platforms=("macos",),
+            options={"install": "true"},
+        ).resolve("macos")
+        ScriptManager(runner).is_installed(evil)
+        # The generated check must shell-quote the package, not interpolate it raw.
+        bash_cmd = runner.calls[0][2]
+        self.assertIn("command -v 'x; touch /tmp/pwned'", bash_cmd)
+        self.assertNotEqual(bash_cmd, "command -v x; touch /tmp/pwned")
+
+
 class CompletionTests(unittest.TestCase):
     def test_bash_script_registers_and_completes_tool_args(self):
         from engine.completion import completion_script
