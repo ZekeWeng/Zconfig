@@ -14,6 +14,7 @@ import re
 import tomllib
 from pathlib import Path
 
+from .atomic import write_text_atomic
 from .domain import KNOWN_PLATFORMS, LATEST, Manifest, Settings, Tool
 from .ports import ManifestStore
 
@@ -70,7 +71,7 @@ class TomlManifestStore(ManifestStore):
             chunks.append(settings_block)
         for tool in sorted(manifest.tools, key=lambda t: t.name):
             chunks.append(_render_tool(tool))
-        self.path.write_text("\n".join(chunks).rstrip() + "\n", encoding="utf-8")
+        write_text_atomic(self.path, "\n".join(chunks).rstrip() + "\n")
 
 
 def _parse_settings(body: dict) -> Settings:

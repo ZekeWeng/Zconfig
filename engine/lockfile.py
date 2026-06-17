@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .atomic import write_text_atomic
 from .domain import Lock, LockEntry
 from .ports import LockStore
 
@@ -57,4 +58,4 @@ class JsonLockStore(LockStore):
                 for entry in sorted(lock.entries, key=lambda e: e.name)
             },
         }
-        self.path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        write_text_atomic(self.path, json.dumps(payload, indent=2) + "\n")
