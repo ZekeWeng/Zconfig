@@ -122,6 +122,22 @@ package = "ripgrep"
 
 A lockfile (`zconfig.lock`, gitignored) records what `zconfig` installed. Orphan removal **only** ever touches tools in that lock — software you installed by hand is never a removal candidate. Every destructive action prompts for confirmation (skip with `--yes`) and honors `--dry-run`. Pinned tools are never auto-updated.
 
+**Trust model — a manifest is executable.** `script`/`manual` tools and `pre_install`/`post_install` hooks run their shell strings via `bash -c`, exactly like a `Makefile` or `Brewfile` does. Treat `software.toml` as code: only run `zconfig sync` against a manifest you trust, and review these fields before adopting someone else's. The engine itself never builds shell strings from external data — package names discovered by `zconfig export` land only in `name`/`package` fields, never in a command — and all package-manager calls pass argument lists (no shell interpolation), so the only execution surface is the shell strings you write yourself.
+
+### Per-tool environment
+
+Any tool can declare an `[env]` table that is exported only for its own install/update/hooks and restored afterward — handy for build flags or registries:
+
+```toml
+[tools.some-crate]
+manager = "cargo"
+package = "some-crate"
+
+[tools.some-crate.env]
+CARGO_NET_GIT_FETCH_WITH_CLI = "true"
+RUSTFLAGS = "-C target-cpu=native"
+```
+
 ### Relationship to the dotfiles installer
 
 The two coexist. `install.sh` / the Brewfile remain the reference for *how* brew installs and how dotfiles are symlinked; the `zconfig` brew adapter **delegates** to `brew`, and Linux tools with a bespoke pinned installer delegate to it via the `script` manager (`run_installer <name>`). The manifest adds the cross-manager, lockfile, drift, and update-prompt layer on top — it does not replace the pinned installers. See `MIGRATION.md`.
