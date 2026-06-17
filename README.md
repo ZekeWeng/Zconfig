@@ -75,6 +75,8 @@ zconfig config list|get|set|unset KEY [VALUE]   # view/edit [settings] without h
 zconfig why NAME               # explain how a tool resolves here + its live state
 ```
 
+`status` and `why` accept `--json` for scripting — pure JSON on stdout (human chrome stays on stderr), so `zconfig status --json | jq '.[] | select(.status=="outdated")'` just works.
+
 `doctor` also statically validates the manifest (unknown managers/platforms, a `script` tool with no install command) and reports those before probing anything live.
 
 Global flags: `--dry-run` (show actions, change nothing), `--yes` (assume yes), `--tags core,dev` (operate on a subset), `--manifest` / `--lock` / `--log-file` (override paths), `--version`. Every run appends to `$ZCONFIG_DIR/.zconfig.log`.

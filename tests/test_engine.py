@@ -7,6 +7,7 @@ escaping, nested override sub-tables, and lock options for orphan removal.
 
 from __future__ import annotations
 
+import json
 import tempfile
 import tomllib
 import unittest
@@ -256,6 +257,49 @@ class ConfigCommandTests(unittest.TestCase):
         TomlManifestStore(path).save(Manifest(tools=(tool(),)))
         outcome = self._engine(path).config("set", "default_platform", "freebsd")
         self.assertFalse(outcome.ok)
+
+
+class JsonOutputTests(unittest.TestCase):
+    def _engine(self, manifest_path: Path):
+        from engine.services import Engine
+
+        return Engine(
+            manifest_store=TomlManifestStore(manifest_path),
+            lock_store=JsonLockStore(Path(tempfile.mktemp())),
+            managers=_NoManagers(),
+            runner=FakeRunner(),
+            console=_SilentConsole(),
+            clock=_FixedClock(),
+            platform="macos",
+        )
+
+    def _capture(self, fn) -> str:
+        import contextlib
+        import io
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            fn()
+        return buffer.getvalue()
+
+    def test_status_json_is_pure_and_parseable(self):
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        TomlManifestStore(path).save(Manifest(tools=(tool(name="a", platforms=("macos",)),)))
+        engine = self._engine(path)
+        out = self._capture(lambda: engine.status(as_json=True))
+        data = json.loads(out)  # stdout must be valid JSON, nothing else
+        self.assertEqual(data[0]["name"], "a")
+        self.assertIn("status", data[0])
+
+    def test_why_json_structure(self):
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        TomlManifestStore(path).save(Manifest(tools=(tool(name="a", platforms=("macos",)),)))
+        engine = self._engine(path)
+        out = self._capture(lambda: engine.why("a", as_json=True))
+        report = json.loads(out)
+        self.assertTrue(report["targeted"])
+        self.assertEqual(report["resolved"]["manager"], "brew")
+        self.assertFalse(report["lock"]["installed_by_zconfig"])
 
 
 class DryRunnerTests(unittest.TestCase):
