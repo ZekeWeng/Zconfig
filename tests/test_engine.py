@@ -313,6 +313,25 @@ class JsonOutputTests(unittest.TestCase):
         self.assertEqual([t["name"] for t in core], ["a"])
 
 
+class CompletionTests(unittest.TestCase):
+    def test_bash_script_registers_and_completes_tool_args(self):
+        from engine.completion import completion_script
+
+        script = completion_script("bash")
+        self.assertIn("complete -F _zconfig zconfig", script)
+        self.assertIn("remove|pin|unpin|why", script)
+
+    def test_zsh_script_has_compdef(self):
+        from engine.completion import completion_script
+
+        self.assertTrue(completion_script("zsh").startswith("#compdef zconfig"))
+
+    def test_unknown_shell_is_none(self):
+        from engine.completion import completion_script
+
+        self.assertIsNone(completion_script("fish"))
+
+
 class DryRunnerTests(unittest.TestCase):
     def test_dryrun_suppresses_mutation_runs_probe(self):
         logged: list[str] = []

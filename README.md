@@ -74,6 +74,16 @@ zconfig doctor                 # verify managers, health checks, orphans
 zconfig export [--write]       # snapshot installed software into manifest form
 zconfig config list|get|set|unset KEY [VALUE]   # view/edit [settings] without hand-editing
 zconfig why NAME               # explain how a tool resolves here + its live state
+zconfig completion bash|zsh    # print a shell completion script
+```
+
+Enable tab-completion (subcommands, flags, and live tool names for `remove`/`pin`/`unpin`/`why`):
+
+```bash
+# bash — add to ~/.bashrc
+source <(zconfig completion bash)
+# zsh — drop into your fpath
+zconfig completion zsh > "${fpath[1]}/_zconfig"
 ```
 
 `status` and `why` accept `--json` for scripting — pure JSON on stdout (human chrome stays on stderr), so `zconfig status --json | jq '.[] | select(.status=="outdated")'` just works.
