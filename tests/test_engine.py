@@ -1,0 +1,189 @@
+"""Engine tests — stdlib unittest only (no pip dependency, runs anywhere).
+
+Focus is the pure domain (the interesting decisions) plus the IO round-trips
+that have bitten us before: TOML quoting of non-bare keys, control-char
+escaping, nested override sub-tables, and lock options for orphan removal.
+"""
+
+from __future__ import annotations
+
+import tempfile
+import tomllib
+import unittest
+from pathlib import Path
+
+from engine.domain import (
+    Lock,
+    LockEntry,
+    Manifest,
+    Observation,
+    Settings,
+    Status,
+    Tool,
+    assess,
+    find_orphans,
+)
+from engine.lockfile import JsonLockStore
+from engine.ports import CommandResult, CommandRunner
+from engine.shell import DryRunner
+from engine.toml_io import TomlManifestStore
+
+
+def tool(**kw) -> Tool:
+    base = dict(name="rg", manager="brew", package="ripgrep")
+    base.update(kw)
+    return Tool(**base)
+
+
+class ResolveTests(unittest.TestCase):
+    def test_platform_filter_returns_none(self):
+        self.assertIsNone(tool(platforms=("linux",)).resolve("macos"))
+
+    def test_override_folds_manager_package_and_env(self):
+        t = tool(
+            platforms=("macos", "linux"),
+            env={"A": "1"},
+            overrides={"linux": {"manager": "apt", "package": "rg-bin", "env": {"B": "2"}}},
+        )
+        mac = t.resolve("macos")
+        lin = t.resolve("linux")
+        self.assertEqual((mac.manager, mac.package, mac.env), ("brew", "ripgrep", {"A": "1"}))
+        self.assertEqual(lin.manager, "apt")
+        self.assertEqual(lin.package, "rg-bin")
+        self.assertEqual(lin.env, {"A": "1", "B": "2"})  # base + override merge
+
+
+class AssessTests(unittest.TestCase):
+    def setUp(self):
+        self.t = tool().resolve("macos")
+        self.pinned = tool(version="14.1.0").resolve("macos")
+
+    def test_missing(self):
+        a = assess(self.t, Observation(installed=False), locked=False)
+        self.assertEqual(a.status, Status.MISSING)
+
+    def test_ok_when_current_equals_latest(self):
+        a = assess(self.t, Observation(installed=True, current="14.1.0", latest="14.1.0"), locked=True)
+        self.assertEqual(a.status, Status.OK)
+
+    def test_outdated(self):
+        a = assess(self.t, Observation(installed=True, current="14.0.0", latest="14.1.0"), locked=True)
+        self.assertEqual(a.status, Status.OUTDATED)
+
+    def test_pinned_satisfied(self):
+        a = assess(self.pinned, Observation(installed=True, current="14.1.0"), locked=True)
+        self.assertEqual(a.status, Status.PINNED)
+
+    def test_pin_drift(self):
+        a = assess(self.pinned, Observation(installed=True, current="15.0.0"), locked=True)
+        self.assertEqual(a.status, Status.PIN_DRIFT)
+
+    def test_pin_prefix_match_is_satisfied(self):
+        t = tool(version="14.1").resolve("macos")
+        a = assess(t, Observation(installed=True, current="14.1.3"), locked=True)
+        self.assertEqual(a.status, Status.PINNED)
+
+    def test_unknown_when_manager_unavailable(self):
+        a = assess(self.t, Observation(installed=False, manager_available=False), locked=False)
+        self.assertEqual(a.status, Status.UNKNOWN)
+
+
+class OrphanTests(unittest.TestCase):
+    def test_locked_but_undeclared_is_orphan(self):
+        manifest = Manifest(tools=(tool(name="keep"),))
+        lock = Lock(
+            entries=(
+                LockEntry("keep", "brew", "keep", "1", "t"),
+                LockEntry("gone", "brew", "gone", "1", "t"),
+            )
+        )
+        orphans = find_orphans(manifest, lock)
+        self.assertEqual([o.name for o in orphans], ["gone"])
+
+    def test_manifest_mutations_preserve_settings(self):
+        m = Manifest(tools=(tool(name="a"),), settings=Settings(default_tags=("core",)))
+        self.assertEqual(m.with_tool(tool(name="b")).settings.default_tags, ("core",))
+        self.assertEqual(m.without_tool("a").settings.default_tags, ("core",))
+
+
+class TomlRoundTripTests(unittest.TestCase):
+    def _round_trip(self, manifest: Manifest) -> Manifest:
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        TomlManifestStore(path).save(manifest)
+        with path.open("rb") as handle:
+            tomllib.load(handle)  # must be valid TOML
+        return TomlManifestStore(path).load()
+
+    def test_non_bare_key_is_quoted(self):
+        m = Manifest(tools=(tool(name="node@22", package="node@22"),))
+        self.assertIn("node@22", self._round_trip(m).names())
+
+    def test_control_chars_escaped_and_preserved(self):
+        nasty = 'a"\\\nb\tc\x01d'
+        out = self._round_trip(Manifest(tools=(tool(name="x", package=nasty),)))
+        self.assertEqual(out.get("x").package, nasty)
+
+    def test_nested_override_options_and_env(self):
+        m = Manifest(
+            tools=(
+                tool(
+                    name="t",
+                    options={"cask": True},
+                    env={"E": "1"},
+                    overrides={"linux": {"manager": "script", "options": {"check": "x"}, "env": {"F": "2"}}},
+                ),
+            )
+        )
+        out = self._round_trip(m).get("t")
+        self.assertEqual(out.options, {"cask": True})
+        self.assertEqual(out.env, {"E": "1"})
+        self.assertEqual(out.overrides["linux"]["options"], {"check": "x"})
+        self.assertEqual(out.overrides["linux"]["env"], {"F": "2"})
+
+    def test_settings_round_trip(self):
+        m = Manifest(tools=(tool(),), settings=Settings(default_tags=("core",), default_platform="linux"))
+        out = self._round_trip(m)
+        self.assertEqual(out.settings, Settings(default_tags=("core",), default_platform="linux"))
+
+
+class LockRoundTripTests(unittest.TestCase):
+    def test_options_persist_for_orphan_removal(self):
+        path = Path(tempfile.mktemp(suffix=".lock"))
+        store = JsonLockStore(path)
+        store.save(Lock(entries=(LockEntry("t", "script", "t", "1", "now", options={"uninstall": "rm x"}),)))
+        loaded = store.load().get("t")
+        self.assertEqual(loaded.options, {"uninstall": "rm x"})
+
+    def test_missing_file_is_empty_lock(self):
+        self.assertEqual(JsonLockStore(Path(tempfile.mktemp())).load(), Lock())
+
+
+class FakeRunner(CommandRunner):
+    """Records mutating calls; answers a programmable map for read-only probes."""
+
+    def __init__(self, probe_ok: bool = True):
+        self.calls: list[list[str]] = []
+        self.probe_ok = probe_ok
+
+    def run(self, args, *, capture=True, read_only=False, env=None):
+        self.calls.append(args)
+        return CommandResult(code=0, stdout="", stderr="")
+
+    def which(self, program):
+        return "/usr/bin/" + program
+
+
+class DryRunnerTests(unittest.TestCase):
+    def test_dryrun_suppresses_mutation_runs_probe(self):
+        logged: list[str] = []
+        inner = FakeRunner()
+        dry = DryRunner(inner, sink=logged.append)
+        dry.run(["brew", "install", "x"])  # mutation
+        dry.run(["brew", "list"], read_only=True)  # probe
+        self.assertEqual(inner.calls, [["brew", "list"]])  # only the probe reached the inner runner
+        self.assertEqual(len(logged), 1)
+        self.assertIn("would run", logged[0])
+
+
+if __name__ == "__main__":
+    unittest.main()

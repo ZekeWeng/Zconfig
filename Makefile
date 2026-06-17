@@ -3,7 +3,7 @@
 
 SHELLS := install.sh bootstrap.sh bin/zconfig $(shell find lib bootstrap tools platform scripts -name '*.sh' 2>/dev/null)
 
-.PHONY: help install install-corp update backup status sync doctor check lint all
+.PHONY: help install install-corp update backup status sync doctor check lint test all
 
 help:        ## Show this menu
 	@awk 'BEGIN{FS=":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-10s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -28,6 +28,9 @@ sync:        ## Converge installed software to software.toml (zconfig)
 
 doctor:      ## Check zconfig environment health
 	@ZCONFIG_DIR=$(CURDIR) ./bin/zconfig doctor
+
+test:        ## Run the engine unit tests (stdlib unittest)
+	@PYTHONPATH=$(CURDIR) python3 -m unittest discover -s tests
 
 check:       ## Bash syntax check every shell script
 	@for f in $(SHELLS); do bash -n "$$f" || exit 1; done

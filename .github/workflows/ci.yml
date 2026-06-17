@@ -35,9 +35,11 @@ jobs:
       - name: Install ruff
         run: python3 -m pip install --user ruff
       - name: Lint
-        run: ~/.local/bin/ruff check engine
+        run: ~/.local/bin/ruff check engine tests
       - name: Compile (stdlib only — no third-party imports)
         run: python3 -m compileall -q engine
+      - name: Unit tests
+        run: PYTHONPATH=. python3 -m unittest discover -s tests
       - name: Smoke-test the CLI
         run: PYTHONPATH=. python3 -m engine --help > /dev/null
 
