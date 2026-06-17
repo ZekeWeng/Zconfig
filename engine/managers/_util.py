@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json as _json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -24,10 +25,20 @@ def clean_version(raw: str) -> str:
 
 
 def pypi_latest(package: str, timeout: float = 5.0) -> str | None:
-    """Latest version from the PyPI JSON API (stdlib urllib, no pip dep)."""
-    url = f"https://pypi.org/pypi/{package}/json"
+    """Latest version from the PyPI JSON API (stdlib urllib, no pip dep).
+
+    The package name is percent-encoded into the path so a name containing
+    slashes or dot-segments cannot reshape the URL, and the request is built
+    explicitly against https://pypi.org — defense in depth even though names
+    come from the trusted manifest.
+    """
+    encoded = urllib.parse.quote(package, safe="")
+    request = urllib.request.Request(
+        f"https://pypi.org/pypi/{encoded}/json",
+        headers={"Accept": "application/json"},
+    )
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             data = _json.loads(response.read().decode("utf-8"))
         return data["info"]["version"]
     except (urllib.error.URLError, KeyError, ValueError, TimeoutError):
