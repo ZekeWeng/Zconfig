@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from .domain import (
+    KNOWN_PLATFORMS,
     LATEST,
     Assessment,
     Lock,
@@ -168,20 +169,22 @@ class Engine:
         results = self._assess(tools, lock)
         by_name = {t.name: t for t in tools}
 
-        installed, failed, skipped, manual = 0, 0, 0, 0
+        installed, skipped = 0, 0
+        failures: list[str] = []
+        manual_steps: list[tuple[str, str]] = []
         for a in results:
             if a.status in (Status.MISSING, Status.PIN_DRIFT):
                 tool = by_name[a.name]
                 manager = self.managers.get(tool.manager)
                 if manager is not None and manager.name == "manual":
                     note = manager.install(tool).stderr.strip()
-                    self.console.warn(f"  {a.name}: manual action required — {note}")
-                    manual += 1
+                    self.console.warn(f"  {a.name}: manual action required")
+                    manual_steps.append((a.name, note))
                 elif self._provision(tool, action="install"):
                     lock = lock.upsert(self._lock_entry(tool))
                     installed += 1
                 else:
-                    failed += 1
+                    failures.append(a.name)
             elif a.status == Status.UNKNOWN:
                 self.console.warn(f"  {a.name}: manager '{a.manager}' unavailable — skipped")
                 skipped += 1
@@ -191,13 +194,21 @@ class Engine:
         self._save_lock(lock)
 
         outdated = sum(1 for a in results if a.status == Status.OUTDATED)
-        parts = [f"{installed} installed", f"{removed[0]} removed", f"{failed} failed", f"{skipped} skipped"]
-        if manual:
-            parts.append(f"{manual} manual")
+        parts = [f"{installed} installed", f"{removed[0]} removed", f"{len(failures)} failed", f"{skipped} skipped"]
+        if manual_steps:
+            parts.append(f"{len(manual_steps)} manual")
         self.console.ok("Sync complete: " + ", ".join(parts) + ".")
         if outdated:
             self.console.info(f"{outdated} tool(s) outdated — run `zconfig update`.")
-        return Outcome(ok=failed == 0)
+        # Surface manual steps and failures as a checklist so they survive the
+        # scrollback of a long run instead of being lost mid-output.
+        if manual_steps:
+            self.console.warn("Manual steps remaining:")
+            for name, note in manual_steps:
+                self.console.warn(f"  - {name}: {note}")
+        if failures:
+            self.console.error("Failed (see errors above): " + ", ".join(failures))
+        return Outcome(ok=not failures)
 
     def _provision(self, tool: ResolvedTool, *, action: str) -> bool:
         manager = self.managers.get(tool.manager)
@@ -418,6 +429,49 @@ class Engine:
         self._save_manifest(manifest)
         self.console.ok(f"Unpinned {name} — it now tracks latest.")
         self.console.info("apt/brew holds are not auto-released; unhold manually if needed.")
+        return Outcome()
+
+    # ── config ────────────────────────────────────────────────────────
+
+    def config(self, action: str, key: str | None = None, value: str | None = None) -> Outcome:
+        """View or edit the manifest's [settings] table from the CLI."""
+        from dataclasses import replace
+
+        settings = self.manifest_store.load().settings
+        current = {
+            "default_tags": ",".join(settings.default_tags),
+            "default_platform": settings.default_platform or "",
+        }
+
+        if action == "list":
+            self.console.table(
+                ["KEY", "VALUE"], [[k, v or "-"] for k, v in current.items()]
+            )
+            return Outcome()
+        if key not in current:
+            self.console.error(f"Unknown setting '{key}'. Known: {', '.join(current)}")
+            return Outcome(ok=False)
+        if action == "get":
+            print(current[key])
+            return Outcome()
+
+        # set / unset
+        if action == "set" and value is None:
+            self.console.error(f"`config set {key}` requires a value")
+            return Outcome(ok=False)
+        if action == "set" and key == "default_platform" and value not in KNOWN_PLATFORMS:
+            self.console.error(f"default_platform must be one of {', '.join(KNOWN_PLATFORMS)}")
+            return Outcome(ok=False)
+        if key == "default_tags":
+            new = replace(
+                settings,
+                default_tags=tuple(t for t in (value or "").split(",") if t) if action == "set" else (),
+            )
+        else:
+            new = replace(settings, default_platform=value if action == "set" else None)
+        manifest = self.manifest_store.load()
+        self._save_manifest(Manifest(tools=manifest.tools, settings=new))
+        self.console.ok(f"{'Set' if action == 'set' else 'Unset'} {key}.")
         return Outcome()
 
     # ── doctor ────────────────────────────────────────────────────────
