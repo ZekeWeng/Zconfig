@@ -170,6 +170,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_export = with_common(sub.add_parser("export", help="snapshot installed software as manifest entries"), tags=False, yes=False, dry=False)
     p_export.add_argument("--write", action="store_true", help="merge discoveries into the manifest")
+
+    p_config = sub.add_parser("config", help="view or edit the [settings] table")
+    p_config.add_argument("action", choices=["list", "get", "set", "unset"])
+    p_config.add_argument("key", nargs="?", help="default_tags | default_platform")
+    p_config.add_argument("value", nargs="?", help="value for `set`")
     return parser
 
 
@@ -203,6 +208,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if engine.doctor().ok else 1
     if args.command == "export":
         return 0 if engine.export(write=args.write).ok else 1
+    if args.command == "config":
+        return 0 if engine.config(args.action, args.key, args.value).ok else 1
     console.error(f"unknown command: {args.command}")
     return 2
 
