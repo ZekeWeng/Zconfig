@@ -243,6 +243,15 @@ def find_orphans(manifest: Manifest, lock: Lock) -> tuple[LockEntry, ...]:
     return tuple(e for e in lock.entries if e.name not in declared)
 
 
+def is_valid_tool_name(name: str) -> bool:
+    """A tool name must be non-empty and free of whitespace and control
+    characters — it is a manifest key and a CLI argument, so spaces/newlines make
+    it painful to reference and are almost always a typo. Symbols like @ . - +
+    (node@22, font-x) are fine.
+    """
+    return bool(name) and all(ch.isprintable() and not ch.isspace() for ch in name)
+
+
 def validate_manifest(manifest: Manifest, known_managers: set[str]) -> list[str]:
     """Static checks over a manifest. Pure — ``known_managers`` is passed in so
     the domain stays unaware of the adapter registry. Returns one human-readable

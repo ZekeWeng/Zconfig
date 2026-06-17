@@ -23,6 +23,7 @@ from engine.domain import (
     Tool,
     assess,
     find_orphans,
+    is_valid_tool_name,
     validate_manifest,
 )
 from engine.lockfile import JsonLockStore
@@ -193,6 +194,12 @@ class ValidateTests(unittest.TestCase):
     def test_script_without_install_flagged(self):
         m = Manifest(tools=(tool(manager="script", platforms=("macos",)),))
         self.assertTrue(any("install command" in p for p in validate_manifest(m, self.KNOWN)))
+
+    def test_tool_name_validation(self):
+        for good in ("node@22", "font-x", "claude-code", "c++", "a.b"):
+            self.assertTrue(is_valid_tool_name(good), good)
+        for bad in ("", " ", "a b", "a\nb", "a\tb", "\x01"):
+            self.assertFalse(is_valid_tool_name(bad), repr(bad))
 
 
 class AtomicWriteTests(unittest.TestCase):

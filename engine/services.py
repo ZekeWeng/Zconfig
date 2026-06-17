@@ -26,6 +26,7 @@ from .domain import (
     Tool,
     assess,
     find_orphans,
+    is_valid_tool_name,
     replace_tool_version,
     validate_manifest,
 )
@@ -398,6 +399,11 @@ class Engine:
     # ── add / remove ──────────────────────────────────────────────────
 
     def add(self, tool: Tool, *, install_now: bool = False) -> Outcome:
+        if not is_valid_tool_name(tool.name):
+            self.console.error(
+                f"Invalid tool name {tool.name!r}: must be non-empty with no whitespace or control characters."
+            )
+            return Outcome(ok=False)
         manifest = self.manifest_store.load()
         if manifest.get(tool.name):
             self.console.error(f"{tool.name} is already in the manifest.")
