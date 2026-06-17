@@ -173,6 +173,70 @@ class FakeRunner(CommandRunner):
         return "/usr/bin/" + program
 
 
+class AtomicWriteTests(unittest.TestCase):
+    def test_creates_and_overwrites(self):
+        from engine.atomic import write_text_atomic
+
+        path = Path(tempfile.mkdtemp()) / "f.txt"
+        write_text_atomic(path, "one")
+        self.assertEqual(path.read_text(), "one")
+        write_text_atomic(path, "two")
+        self.assertEqual(path.read_text(), "two")
+        # no leftover temp files in the directory
+        self.assertEqual([p.name for p in path.parent.iterdir()], ["f.txt"])
+
+
+class _SilentConsole:
+    def info(self, m): ...
+    def ok(self, m): ...
+    def warn(self, m): ...
+    def error(self, m): ...
+    def table(self, headers, rows, *, highlight=None): ...
+    def confirm(self, prompt, *, default=False): return default
+    def choose(self, prompt, choices, default): return default
+
+
+class _NoManagers:
+    def get(self, name): return None
+    def all(self): return []
+
+
+class _FixedClock:
+    def now_iso(self): return "2026-01-01T00:00:00+00:00"
+
+
+class ConfigCommandTests(unittest.TestCase):
+    def _engine(self, manifest_path: Path):
+        from engine.services import Engine
+
+        return Engine(
+            manifest_store=TomlManifestStore(manifest_path),
+            lock_store=JsonLockStore(Path(tempfile.mktemp())),
+            managers=_NoManagers(),
+            runner=FakeRunner(),
+            console=_SilentConsole(),
+            clock=_FixedClock(),
+            platform="macos",
+        )
+
+    def test_set_unset_round_trip(self):
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        TomlManifestStore(path).save(Manifest(tools=(tool(),)))
+        engine = self._engine(path)
+
+        engine.config("set", "default_tags", "core,dev")
+        self.assertEqual(TomlManifestStore(path).load().settings.default_tags, ("core", "dev"))
+
+        engine.config("unset", "default_tags")
+        self.assertEqual(TomlManifestStore(path).load().settings.default_tags, ())
+
+    def test_set_rejects_unknown_platform(self):
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        TomlManifestStore(path).save(Manifest(tools=(tool(),)))
+        outcome = self._engine(path).config("set", "default_platform", "freebsd")
+        self.assertFalse(outcome.ok)
+
+
 class DryRunnerTests(unittest.TestCase):
     def test_dryrun_suppresses_mutation_runs_probe(self):
         logged: list[str] = []

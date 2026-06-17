@@ -71,6 +71,7 @@ zconfig pin NAME [VERSION]     # lock a version (default: the installed one)
 zconfig unpin NAME             # track latest again
 zconfig doctor                 # verify managers, health checks, orphans
 zconfig export [--write]       # snapshot installed software into manifest form
+zconfig config list|get|set|unset KEY [VALUE]   # view/edit [settings] without hand-editing
 ```
 
 Global flags: `--dry-run` (show actions, change nothing), `--yes` (assume yes), `--tags core,dev` (operate on a subset), `--manifest` / `--lock` / `--log-file` (override paths), `--version`. Every run appends to `$ZCONFIG_DIR/.zconfig.log`.
@@ -84,6 +85,8 @@ Bake persistent defaults into an optional `[settings]` table so you don't repeat
 default_tags     = ["core"]   # commands act on this subset when no --tags is passed
 default_platform = "linux"    # plan/converge as if on another OS
 ```
+
+Edit these from the CLI instead of by hand: `zconfig config set default_tags core,dev`, `zconfig config unset default_platform`, or `zconfig config list`.
 
 Resolution precedence is **flag / env var → `[settings]` → built-in default**:
 
