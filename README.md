@@ -61,6 +61,7 @@ Alongside the dotfiles installer, `zconfig` is a declarative engine that treats 
 Run it via `./bin/zconfig <command>` (or the `make status`/`sync`/`doctor` shortcuts). It needs only Python 3.11+ (for stdlib `tomllib`) — no pip packages.
 
 ```
+zconfig list       # inventory the manifest (fast; no live probing)
 zconfig status     # show drift: missing / outdated / pinned / orphaned
 zconfig sync       # install missing, fix pins, deprovision orphans (respects pins)
 zconfig update     # interactively update outdated tools: [u]pdate [s]kip [p]in [a]ll

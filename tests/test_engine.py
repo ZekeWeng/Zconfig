@@ -301,6 +301,17 @@ class JsonOutputTests(unittest.TestCase):
         self.assertEqual(report["resolved"]["manager"], "brew")
         self.assertFalse(report["lock"]["installed_by_zconfig"])
 
+    def test_list_json_and_tag_filter(self):
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        TomlManifestStore(path).save(
+            Manifest(tools=(tool(name="a", tags=("core",)), tool(name="b", tags=("dev",))))
+        )
+        engine = self._engine(path)
+        every = json.loads(self._capture(lambda: engine.list_tools(as_json=True)))
+        self.assertEqual({t["name"] for t in every}, {"a", "b"})
+        core = json.loads(self._capture(lambda: engine.list_tools({"core"}, as_json=True)))
+        self.assertEqual([t["name"] for t in core], ["a"])
+
 
 class DryRunnerTests(unittest.TestCase):
     def test_dryrun_suppresses_mutation_runs_probe(self):
