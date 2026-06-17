@@ -73,7 +73,28 @@ zconfig doctor                 # verify managers, health checks, orphans
 zconfig export [--write]       # snapshot installed software into manifest form
 ```
 
-Global flags: `--dry-run` (show actions, change nothing), `--yes` (assume yes), `--tags core,dev` (operate on a subset), `--manifest` / `--lock` / `--log-file` (override paths). Every run appends to `$ZCONFIG_DIR/.zconfig.log`.
+Global flags: `--dry-run` (show actions, change nothing), `--yes` (assume yes), `--tags core,dev` (operate on a subset), `--manifest` / `--lock` / `--log-file` (override paths), `--version`. Every run appends to `$ZCONFIG_DIR/.zconfig.log`.
+
+### Configuring defaults
+
+Bake persistent defaults into an optional `[settings]` table so you don't repeat flags. Anything here is overridable per-run by a flag or environment variable.
+
+```toml
+[settings]
+default_tags     = ["core"]   # commands act on this subset when no --tags is passed
+default_platform = "linux"    # plan/converge as if on another OS
+```
+
+Resolution precedence is **flag / env var → `[settings]` → built-in default**:
+
+| Knob | Env var | `[settings]` key | Flag |
+|------|---------|------------------|------|
+| Target platform | `ZCONFIG_PLATFORM` | `default_platform` | — |
+| Tag subset | — | `default_tags` | `--tags` |
+| Repo location | `ZCONFIG_DIR` | — | — |
+| Manifest / lock / log paths | — | — | `--manifest` / `--lock` / `--log-file` |
+
+`default_platform` (or `ZCONFIG_PLATFORM=linux`) lets a Mac preview exactly what a Linux converge would do — including the per-OS `overrides` — without leaving the laptop.
 
 ### The manifest
 
