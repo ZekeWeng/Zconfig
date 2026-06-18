@@ -157,7 +157,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = with_common(sub.add_parser("status", help="show drift vs the manifest"), yes=False, dry=False)
     p_status.add_argument("--json", action="store_true", help="emit JSON on stdout instead of a table")
     with_common(sub.add_parser("update", help="interactively update outdated tools"), yes=False)
-    with_common(sub.add_parser("doctor", help="check environment health"), tags=False, yes=False, dry=False)
+    p_doctor = with_common(sub.add_parser("doctor", help="check environment health"), tags=False, yes=False, dry=False)
+    p_doctor.add_argument("--json", action="store_true", help="emit JSON on stdout")
 
     p_add = with_common(sub.add_parser("add", help="add a tool to the manifest"), tags=False)
     p_add.add_argument("name")
@@ -244,7 +245,7 @@ def _dispatch(engine: Engine, args: argparse.Namespace, console: TerminalConsole
     if args.command == "unpin":
         return 0 if engine.unpin(args.name).ok else 1
     if args.command == "doctor":
-        return 0 if engine.doctor().ok else 1
+        return 0 if engine.doctor(as_json=args.json).ok else 1
     if args.command == "export":
         return 0 if engine.export(write=args.write).ok else 1
     if args.command == "config":

@@ -641,53 +641,53 @@ class Engine:
 
     # ── doctor ────────────────────────────────────────────────────────
 
-    def doctor(self) -> Outcome:
-        problems = 0
-        self.console.info("Package managers:")
-        known = {manager.name for manager in self.managers.all()}
-        for manager in self.managers.all():
-            mark = "ok " if manager.is_available() else "-- "
-            self.console.info(f"  [{mark}] {manager.name}")
+    def doctor(self, *, as_json: bool = False) -> Outcome:
+        report = self._build_doctor()
+        if as_json:
+            print(json.dumps(report, indent=2))
+        else:
+            self._render_doctor(report)
+        return Outcome(ok=report["ok"])
 
+    def _build_doctor(self) -> dict:
+        known = {manager.name for manager in self.managers.all()}
         manifest = self.manifest_store.load()
         lock = self.lock_store.load()
 
-        # Static manifest validation first — unknown platforms/managers or a
-        # script tool with no install command are config errors, surfaced before
-        # we probe anything live.
-        manifest_problems = validate_manifest(manifest, known)
-        if manifest_problems:
-            self.console.error("Manifest problems:")
-            for problem in manifest_problems:
-                self.console.error(f"  {problem}")
-            problems += len(manifest_problems)
-
-        tools = manifest.for_platform(self.platform)
-
-        self.console.info("Declared tools on this platform:")
-        for tool in tools:
+        report: dict = {
+            "managers": {m.name: m.is_available() for m in self.managers.all()},
+            "manifest_problems": validate_manifest(manifest, known),
+            "health_failures": [],
+            "orphans": [o.name for o in find_orphans(manifest, lock)],
+            "ok": True,
+        }
+        for tool in manifest.for_platform(self.platform):
             manager = self.managers.get(tool.manager)
-            if manager is None:
-                self.console.error(f"  {tool.name}: unknown manager '{tool.manager}'")
-                problems += 1
-                continue
-            if not manager.is_available():
-                self.console.warn(f"  {tool.name}: manager '{tool.manager}' not installed")
-                continue
+            if manager is None or not manager.is_available():
+                continue  # config errors covered by manifest_problems; absence is environmental
             if manager.is_installed(tool) and tool.post_install:
                 if not self.runner.run(["bash", "-c", tool.post_install], read_only=True).ok:
-                    self.console.error(f"  {tool.name}: health check failed ({tool.post_install})")
-                    problems += 1
+                    report["health_failures"].append({"tool": tool.name, "check": tool.post_install})
+        report["ok"] = not report["manifest_problems"] and not report["health_failures"]
+        return report
 
-        orphans = find_orphans(manifest, lock)
-        if orphans:
-            self.console.warn(f"{len(orphans)} orphaned tool(s) in the lock: " + ", ".join(o.name for o in orphans))
-
-        if problems:
-            self.console.error(f"doctor found {problems} problem(s).")
-            return Outcome(ok=False)
-        self.console.ok("doctor: environment looks healthy.")
-        return Outcome()
+    def _render_doctor(self, report: dict) -> None:
+        self.console.info("Package managers:")
+        for name, available in report["managers"].items():
+            self.console.info(f"  [{'ok ' if available else '-- '}] {name}")
+        if report["manifest_problems"]:
+            self.console.error("Manifest problems:")
+            for problem in report["manifest_problems"]:
+                self.console.error(f"  {problem}")
+        for failure in report["health_failures"]:
+            self.console.error(f"  {failure['tool']}: health check failed ({failure['check']})")
+        if report["orphans"]:
+            self.console.warn(f"{len(report['orphans'])} orphaned tool(s) in the lock: " + ", ".join(report["orphans"]))
+        if report["ok"]:
+            self.console.ok("doctor: environment looks healthy.")
+        else:
+            count = len(report["manifest_problems"]) + len(report["health_failures"])
+            self.console.error(f"doctor found {count} problem(s).")
 
     # ── export ────────────────────────────────────────────────────────
 

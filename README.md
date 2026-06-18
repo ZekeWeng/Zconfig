@@ -86,7 +86,7 @@ source <(zconfig completion bash)
 zconfig completion zsh > "${fpath[1]}/_zconfig"
 ```
 
-`status` and `why` accept `--json` for scripting — pure JSON on stdout (human chrome stays on stderr), so `zconfig status --json | jq '.[] | select(.status=="outdated")'` just works.
+`status`, `why`, `list`, and `doctor` accept `--json` for scripting — pure JSON on stdout (human chrome stays on stderr), so `zconfig status --json | jq '.[] | select(.status=="outdated")'` just works. `doctor --json` returns an `ok` boolean plus structured `manifest_problems`/`health_failures`/`orphans`, so CI can gate on `zconfig doctor --json | jq -e .ok`.
 
 `doctor` also statically validates the manifest (unknown managers/platforms, a `script` tool with no install command) and reports those before probing anything live.
 

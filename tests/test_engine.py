@@ -308,6 +308,16 @@ class JsonOutputTests(unittest.TestCase):
         self.assertEqual(report["resolved"]["manager"], "brew")
         self.assertFalse(report["lock"]["installed_by_zconfig"])
 
+    def test_doctor_json_structure_and_ok_flag(self):
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        TomlManifestStore(path).save(Manifest(tools=(tool(manager="brew", platforms=("macos",)),)))
+        engine = self._engine(path)  # _NoManagers => brew is unknown here
+        report = json.loads(self._capture(lambda: engine.doctor(as_json=True)))
+        self.assertIn("managers", report)
+        self.assertIn("ok", report)
+        self.assertFalse(report["ok"])  # unknown manager is a manifest problem
+        self.assertTrue(report["manifest_problems"])
+
     def test_list_json_and_tag_filter(self):
         path = Path(tempfile.mktemp(suffix=".toml"))
         TomlManifestStore(path).save(
