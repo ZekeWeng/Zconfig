@@ -10,18 +10,9 @@ import urllib.parse
 import urllib.request
 
 
-def first_token(line: str) -> str:
-    parts = line.split()
-    return parts[0] if parts else ""
-
-
 def nth_token(line: str, index: int) -> str | None:
     parts = line.split()
     return parts[index] if len(parts) > index else None
-
-
-def clean_version(raw: str) -> str:
-    return raw.strip().lstrip("v")
 
 
 def pypi_latest(package: str, timeout: float = 5.0) -> str | None:

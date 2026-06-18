@@ -36,7 +36,6 @@ from .ports import Clock, CommandRunner, Console, LockStore, ManagerProvider, Ma
 @dataclass
 class Outcome:
     ok: bool = True
-    messages: tuple[str, ...] = ()
 
 
 # Status value -> semantic color, so `status` reads at a glance.

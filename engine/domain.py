@@ -198,10 +198,6 @@ class Assessment:
     latest: str | None = None
     pinned: bool = False
 
-    @property
-    def needs_action(self) -> bool:
-        return self.status in (Status.MISSING, Status.OUTDATED, Status.PIN_DRIFT, Status.ORPHAN)
-
 
 def assess(tool: ResolvedTool, obs: Observation, locked: bool) -> Assessment:
     """Classify a declared tool against what's actually installed. Pure.
