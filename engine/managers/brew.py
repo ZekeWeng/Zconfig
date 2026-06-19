@@ -23,6 +23,9 @@ _NO_AUTO_UPDATE = {"HOMEBREW_NO_AUTO_UPDATE": "1"}
 @register
 class BrewManager(PackageManager):
     name = "brew"
+    # Homebrew installs only the current formula version; a pin maps to `brew pin`
+    # (hold current), so pinning to a *different* version can never converge.
+    installs_exact_version = False
 
     def __init__(self, runner) -> None:
         super().__init__(runner)

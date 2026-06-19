@@ -26,10 +26,10 @@ class Status(str, Enum):
     OK = "ok"  # installed, at the version we want
     MISSING = "missing"  # declared, not installed
     OUTDATED = "outdated"  # installed but a newer version is available (unpinned)
-    PIN_DRIFT = "pin-drift"  # pinned to X, but a different version is installed
+    PIN_DRIFT = "pin-drift"  # pinned to X, different version installed — fixable by reinstall
+    PIN_UNSATISFIABLE = "pin-unsatisfiable"  # pinned to X, but the manager cannot install X
     PINNED = "pinned"  # pinned and satisfied — held, never auto-updated
     ORPHAN = "orphan"  # installed by zconfig, no longer in the manifest
-    SKIPPED = "skipped"  # not applicable to this platform
     UNKNOWN = "unknown"  # manager unavailable, cannot determine
 
 
@@ -50,6 +50,7 @@ class Tool:
     tags: tuple[str, ...] = ()
     pre_install: str | None = None
     post_install: str | None = None
+    health_check: str | None = None
     options: dict[str, object] = field(default_factory=dict)
     env: dict[str, str] = field(default_factory=dict)
     overrides: dict[str, dict[str, object]] = field(default_factory=dict)
@@ -78,6 +79,7 @@ class Tool:
             tags=self.tags,
             pre_install=_opt_str(over.get("pre_install", self.pre_install)),
             post_install=_opt_str(over.get("post_install", self.post_install)),
+            health_check=_opt_str(over.get("health_check", self.health_check)),
             options={**self.options, **over.get("options", {})},
             env={**self.env, **over.get("env", {})},
         )
@@ -95,11 +97,18 @@ class ResolvedTool:
     pre_install: str | None
     post_install: str | None
     options: dict[str, object]
+    health_check: str | None = None
     env: dict[str, str] = field(default_factory=dict)
 
     @property
     def is_pinned(self) -> bool:
         return self.version != LATEST
+
+    @property
+    def health_command(self) -> str | None:
+        """The command `doctor` runs to verify health: an explicit ``health_check``
+        if given, else ``post_install`` (which historically doubled as one)."""
+        return self.health_check or self.post_install
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,9 +173,6 @@ class Lock:
     def get(self, name: str) -> LockEntry | None:
         return next((e for e in self.entries if e.name == name), None)
 
-    def names(self) -> set[str]:
-        return {e.name for e in self.entries}
-
     def upsert(self, entry: LockEntry) -> Lock:
         kept = tuple(e for e in self.entries if e.name != entry.name)
         return Lock(entries=kept + (entry,))
@@ -199,12 +205,16 @@ class Assessment:
     pinned: bool = False
 
 
-def assess(tool: ResolvedTool, obs: Observation, locked: bool) -> Assessment:
+def assess(tool: ResolvedTool, obs: Observation, *, pin_exact_supported: bool = True) -> Assessment:
     """Classify a declared tool against what's actually installed. Pure.
 
-    ``locked`` says whether zconfig recorded installing it — only relevant for
-    reporting; orphan detection (declared-gone-but-locked) is handled separately
-    in :func:`find_orphans` because it needs the manifest/lock sets, not a tool.
+    Orphan detection (declared-gone-but-locked) is handled separately in
+    :func:`find_orphans` because it needs the manifest/lock sets, not a tool.
+
+    ``pin_exact_supported`` is the manager's capability (passed in to keep the
+    domain ignorant of adapters): when False, a pin to a version other than the
+    one installed can never converge, so we report it as PIN_UNSATISFIABLE rather
+    than PIN_DRIFT, which would otherwise make sync reinstall on every run.
     """
     base = dict(
         name=tool.name,
@@ -220,9 +230,13 @@ def assess(tool: ResolvedTool, obs: Observation, locked: bool) -> Assessment:
     if not obs.installed:
         return Assessment(status=Status.MISSING, **base)
     if tool.is_pinned:
+        # Can't read the installed version → can't claim the pin is satisfied.
+        if obs.current is None:
+            return Assessment(status=Status.UNKNOWN, **base)
         # A pin is satisfied only when the installed version matches exactly.
-        if obs.current is not None and not _version_matches(obs.current, tool.version):
-            return Assessment(status=Status.PIN_DRIFT, **base)
+        if not version_matches(obs.current, tool.version):
+            drift = Status.PIN_DRIFT if pin_exact_supported else Status.PIN_UNSATISFIABLE
+            return Assessment(status=drift, **base)
         return Assessment(status=Status.PINNED, **base)
     if obs.latest is not None and obs.current is not None and obs.current != obs.latest:
         return Assessment(status=Status.OUTDATED, **base)
@@ -275,8 +289,10 @@ def validate_manifest(manifest: Manifest, known_managers: set[str]) -> list[str]
     return problems
 
 
-def _version_matches(installed: str, pinned: str) -> bool:
-    # Tolerate a leading "v" and prefix pins (pinning "1.2" matches "1.2.3").
+def version_matches(installed: str, pinned: str) -> bool:
+    """Does ``installed`` satisfy the ``pinned`` request? Tolerates a leading "v"
+    and prefix pins (pinning "1.2" matches "1.2.3"). Pure; shared by assess and
+    the pin-time satisfiability check."""
     a = installed.lstrip("v")
     b = pinned.lstrip("v")
     return a == b or a.startswith(b + ".")

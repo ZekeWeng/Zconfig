@@ -10,7 +10,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from .domain import Lock, Manifest, Observation, ResolvedTool
+from .domain import Lock, Manifest, Observation, ResolvedTool, Tool
 
 
 @dataclass(frozen=True)
@@ -56,6 +56,12 @@ class PackageManager(ABC):
     """
 
     name: str
+
+    # Whether ``install`` can honor an exact ``tool.version``. Managers that can
+    # only ever install/hold the current upstream version (brew, generic scripts)
+    # set this False, so a pin to a different version is reported as
+    # PIN_UNSATISFIABLE instead of looping as PIN_DRIFT. See domain.assess.
+    installs_exact_version: bool = True
 
     def __init__(self, runner: CommandRunner) -> None:
         self.runner = runner
@@ -134,6 +140,14 @@ class ManifestStore(ABC):
     @abstractmethod
     def exists(self) -> bool:
         ...
+
+    @abstractmethod
+    def render(self, tool: Tool) -> str:
+        """Serialize one tool to its manifest text, without writing a file.
+
+        Lets the application layer show a manifest-shaped preview (e.g. `export`)
+        without reaching into the store's serializer — the store owns the format.
+        """
 
 
 class LockStore(ABC):

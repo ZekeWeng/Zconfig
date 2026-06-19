@@ -11,11 +11,7 @@ Install:
 
 from __future__ import annotations
 
-# Commands and the subset that take a tool name as their first argument.
-_COMMANDS = (
-    "bootstrap sync status list update add remove pin unpin doctor export config why completion"
-)
-_TOOL_ARG_COMMANDS = "remove pin unpin why"
+from .commands import command_names, tool_arg_command_names
 
 _BASH = """\
 # zconfig bash completion. Install: source <(zconfig completion bash)
@@ -78,10 +74,11 @@ _zconfig "$@"
 
 
 def completion_script(shell: str) -> str | None:
+    tool_args = "|".join(tool_arg_command_names())
     fields = {
-        "commands": _COMMANDS,
-        "tool_arg": "|".join(_TOOL_ARG_COMMANDS.split()),
-        "tool_arg_zsh": "|".join(_TOOL_ARG_COMMANDS.split()),
+        "commands": " ".join(command_names()),
+        "tool_arg": tool_args,
+        "tool_arg_zsh": tool_args,
     }
     if shell == "bash":
         return _BASH % fields
