@@ -22,7 +22,7 @@ before.
 |------|---------|
 | `software.toml` | The declarative manifest — single source of truth for every managed tool |
 | `bin/zconfig` | Zero-dependency bash entrypoint; finds Python 3.11+ and runs the engine |
-| `engine/` | The engine (pure-stdlib Python, hexagonal): `domain` core, `ports`, `managers/` adapters, `services`, `__main__` composition root |
+| `engine/` | The engine (pure-stdlib Python, hexagonal): `domain` core, `ports`, `managers/` adapters, `services`, `commands` CLI table, `__main__` composition root |
 | `zconfig.lock` | Per-machine record of what `zconfig` installed (gitignored) |
 | `.zconfig.log` | Per-machine run log (gitignored) |
 | `MIGRATION.md` | This file |
