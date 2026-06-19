@@ -117,7 +117,7 @@ Resolution precedence is **flag / env var → `[settings]` → built-in default*
 
 ### The manifest
 
-Each tool is one `[tools.<name>]` block. `manager` selects the backend; `version` is `latest` or an exact pin; `platforms` scopes it; `tags` group it for subset installs; `pre_install`/`post_install` are optional hooks (`post_install` doubles as a health check). Per-platform differences go in an `overrides` sub-table.
+Each tool is one `[tools.<name>]` block. `manager` selects the backend; `version` is `latest` or an exact pin; `platforms` scopes it; `tags` group it for subset installs; `pre_install`/`post_install` are optional hooks. `post_install` doubles as a health check, or declare a dedicated `health_check` command (what `doctor` runs to verify the tool; it falls back to `post_install` when unset). Per-platform differences go in an `overrides` sub-table.
 
 ```toml
 [tools.ripgrep]
@@ -140,6 +140,8 @@ package = "ripgrep"
 ### Safety model
 
 A lockfile (`zconfig.lock`, gitignored) records what `zconfig` installed. Orphan removal **only** ever touches tools in that lock — software you installed by hand is never a removal candidate. Every destructive action prompts for confirmation (skip with `--yes`) and honors `--dry-run`. Pinned tools are never auto-updated.
+
+**Pins and what a manager can reach.** Most managers install an exact version (`apt pkg=ver`, `cargo --version`, `pipx ==ver`, `go @ver`, `npm/pnpm @ver`), so a pin to an available version converges on the next `sync`. Homebrew and generic `script` tools can only ever install/hold the *current* upstream version — so pinning one of them to a different version is reported as `pin-unsatisfiable` rather than looping as `pin-drift`. `sync` skips it with a one-line hint instead of reinstalling on every run, and `pin` warns at the moment you create such a pin. For brew, a pin means "hold what's installed" (`brew pin`).
 
 **Trust model — a manifest is executable.** `script`/`manual` tools and `pre_install`/`post_install` hooks run their shell strings via `bash -c`, exactly like a `Makefile` or `Brewfile` does. Treat `software.toml` as code: only run `zconfig sync` against a manifest you trust, and review these fields before adopting someone else's. The engine itself never builds shell strings from external data — package names discovered by `zconfig export` land only in `name`/`package` fields, never in a command — and all package-manager calls pass argument lists (no shell interpolation), so the only execution surface is the shell strings you write yourself.
 
@@ -172,9 +174,16 @@ from . import register
 @register
 class MyManager(PackageManager):
     name = "mymgr"
+    # installs_exact_version defaults to True — set False if `install` can only
+    # ever land the current upstream version (so a pin to another version is
+    # reported as pin-unsatisfiable instead of looping). See brew/script.
     def is_available(self): return self.runner.which("mymgr") is not None
     # ... implement the rest, using self.runner.run([...], read_only=True) for probes
 ```
+
+### Adding a command
+
+CLI subcommands follow the same drop-in pattern as adapters. Add one `Command` entry to the `COMMANDS` table in `engine/commands.py` — its name, help, a `configure(parser)` callback, and a `run(engine, args)` handler. `build_parser`, dispatch, and shell completion all derive from that table, so there is no second place to edit.
 
 ---
 
@@ -182,7 +191,7 @@ class MyManager(PackageManager):
 
 Hexagonal: dependencies point inward. `install.sh` is the composition root for the dotfiles installer; `engine/__main__.py` is the composition root for the `zconfig` engine. Each tool ships its installer and config side-by-side under `tools/<category>/<tool>/`.
 
-The `zconfig` engine follows the same rule: `engine/domain.py` is the pure core (no I/O), `engine/ports.py` the interfaces, `engine/managers/` + the `shell`/`console`/`toml_io`/`lockfile`/`platform` adapters the outside edge, `engine/services.py` the application layer, and `engine/__main__.py` the only place concretes are wired.
+The `zconfig` engine follows the same rule: `engine/domain.py` is the pure core (no I/O), `engine/ports.py` the interfaces, `engine/managers/` + the `shell`/`console`/`toml_io`/`lockfile`/`platform` adapters the outside edge, `engine/services.py` the application layer, `engine/commands.py` the CLI command table, and `engine/__main__.py` the composition root — the only place concretes are wired. Two registries keep the edges open for extension: package managers self-register on import (`engine/managers/`), and CLI subcommands are entries in one `COMMANDS` table (`engine/commands.py`).
 
 ```
 Makefile                  # user-facing menu
