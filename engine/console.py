@@ -8,7 +8,7 @@ optional log sink for the persistent run log.
 from __future__ import annotations
 
 import sys
-from typing import Callable
+from collections.abc import Callable
 
 _RED = "\033[0;31m"
 _GREEN = "\033[0;32m"

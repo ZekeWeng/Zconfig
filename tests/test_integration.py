@@ -65,6 +65,14 @@ class FullCycleIntegration(unittest.TestCase):
         self.assertFalse(self.flag.exists())
         self.assertEqual(self._locked(), {})
 
+    def test_add_with_health_check_writes_the_field(self):
+        code = self._run(
+            "add", "widget", "--manager", "manual", "--package", "widget",
+            "--health-check", "widget --version", "--yes",
+        )
+        self.assertEqual(code, 0)
+        self.assertIn('health_check = "widget --version"', self.manifest.read_text())
+
     def test_dry_run_changes_nothing(self):
         self.assertEqual(self._run("sync", "--dry-run", "--yes"), 0)
         self.assertFalse(self.flag.exists())  # install command never ran

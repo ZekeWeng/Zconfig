@@ -33,6 +33,9 @@ def _bash(cmd: str) -> list[str]:
 @register
 class ScriptManager(PackageManager):
     name = "script"
+    # A script's `install` snippet installs whatever it installs; the engine can't
+    # guarantee it lands an arbitrary pinned version, so don't promise exact pins.
+    installs_exact_version = False
 
     def _opt(self, tool: ResolvedTool, key: str) -> str | None:
         value = tool.options.get(key)

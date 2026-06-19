@@ -27,7 +27,7 @@ from engine.domain import (
     validate_manifest,
 )
 from engine.lockfile import JsonLockStore
-from engine.ports import CommandResult, CommandRunner
+from engine.ports import CommandResult, CommandRunner, PackageManager
 from engine.shell import DryRunner
 from engine.toml_io import TomlManifestStore
 
@@ -36,6 +36,16 @@ def tool(**kw) -> Tool:
     base = dict(name="rg", manager="brew", package="ripgrep")
     base.update(kw)
     return Tool(**base)
+
+
+def _capture_stdout(fn) -> str:
+    import contextlib
+    import io
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        fn()
+    return buffer.getvalue()
 
 
 class ResolveTests(unittest.TestCase):
@@ -62,33 +72,65 @@ class AssessTests(unittest.TestCase):
         self.pinned = tool(version="14.1.0").resolve("macos")
 
     def test_missing(self):
-        a = assess(self.t, Observation(installed=False), locked=False)
+        a = assess(self.t, Observation(installed=False))
         self.assertEqual(a.status, Status.MISSING)
 
     def test_ok_when_current_equals_latest(self):
-        a = assess(self.t, Observation(installed=True, current="14.1.0", latest="14.1.0"), locked=True)
+        a = assess(self.t, Observation(installed=True, current="14.1.0", latest="14.1.0"))
         self.assertEqual(a.status, Status.OK)
 
     def test_outdated(self):
-        a = assess(self.t, Observation(installed=True, current="14.0.0", latest="14.1.0"), locked=True)
+        a = assess(self.t, Observation(installed=True, current="14.0.0", latest="14.1.0"))
         self.assertEqual(a.status, Status.OUTDATED)
 
     def test_pinned_satisfied(self):
-        a = assess(self.pinned, Observation(installed=True, current="14.1.0"), locked=True)
+        a = assess(self.pinned, Observation(installed=True, current="14.1.0"))
         self.assertEqual(a.status, Status.PINNED)
 
-    def test_pin_drift(self):
-        a = assess(self.pinned, Observation(installed=True, current="15.0.0"), locked=True)
+    def test_pin_drift_when_manager_can_install_exact(self):
+        a = assess(self.pinned, Observation(installed=True, current="15.0.0"))
         self.assertEqual(a.status, Status.PIN_DRIFT)
+
+    def test_pin_unsatisfiable_when_manager_cannot_install_exact(self):
+        # brew-style manager: a mismatched pin can never converge, so it must not
+        # be reported as PIN_DRIFT (which would make sync reinstall every run).
+        a = assess(
+            self.pinned,
+            Observation(installed=True, current="15.0.0"),
+            pin_exact_supported=False,
+        )
+        self.assertEqual(a.status, Status.PIN_UNSATISFIABLE)
+
+    def test_pinned_but_version_unreadable_is_unknown_not_pinned(self):
+        # No installed version to compare against → can't claim the pin is satisfied.
+        a = assess(self.pinned, Observation(installed=True, current=None))
+        self.assertEqual(a.status, Status.UNKNOWN)
 
     def test_pin_prefix_match_is_satisfied(self):
         t = tool(version="14.1").resolve("macos")
-        a = assess(t, Observation(installed=True, current="14.1.3"), locked=True)
+        a = assess(t, Observation(installed=True, current="14.1.3"))
         self.assertEqual(a.status, Status.PINNED)
 
     def test_unknown_when_manager_unavailable(self):
-        a = assess(self.t, Observation(installed=False, manager_available=False), locked=False)
+        a = assess(self.t, Observation(installed=False, manager_available=False))
         self.assertEqual(a.status, Status.UNKNOWN)
+
+
+class HealthCommandTests(unittest.TestCase):
+    def test_explicit_health_check_wins_over_post_install(self):
+        resolved = tool(post_install="rg --version", health_check="rg --count x README").resolve("macos")
+        self.assertEqual(resolved.health_command, "rg --count x README")
+
+    def test_falls_back_to_post_install(self):
+        self.assertEqual(tool(post_install="rg --version").resolve("macos").health_command, "rg --version")
+
+    def test_none_when_neither_set(self):
+        self.assertIsNone(tool().resolve("macos").health_command)
+
+    def test_override_can_set_health_check_per_platform(self):
+        t = tool(platforms=("macos", "linux"), overrides={"linux": {"health_check": "rg -V"}})
+        self.assertIsNone(t.resolve("macos").health_command)
+        self.assertEqual(t.resolve("linux").health_command, "rg -V")
 
 
 class OrphanTests(unittest.TestCase):
@@ -142,6 +184,10 @@ class TomlRoundTripTests(unittest.TestCase):
         self.assertEqual(out.env, {"E": "1"})
         self.assertEqual(out.overrides["linux"]["options"], {"check": "x"})
         self.assertEqual(out.overrides["linux"]["env"], {"F": "2"})
+
+    def test_health_check_round_trips(self):
+        m = Manifest(tools=(tool(name="rg", health_check="rg --version"),))
+        self.assertEqual(self._round_trip(m).get("rg").health_check, "rg --version")
 
     def test_settings_round_trip(self):
         m = Manifest(tools=(tool(),), settings=Settings(default_tags=("core",), default_platform="linux"))
@@ -280,20 +326,11 @@ class JsonOutputTests(unittest.TestCase):
             platform="macos",
         )
 
-    def _capture(self, fn) -> str:
-        import contextlib
-        import io
-
-        buffer = io.StringIO()
-        with contextlib.redirect_stdout(buffer):
-            fn()
-        return buffer.getvalue()
-
     def test_status_json_is_pure_and_parseable(self):
         path = Path(tempfile.mktemp(suffix=".toml"))
         TomlManifestStore(path).save(Manifest(tools=(tool(name="a", platforms=("macos",)),)))
         engine = self._engine(path)
-        out = self._capture(lambda: engine.status(as_json=True))
+        out = _capture_stdout(lambda: engine.status(as_json=True))
         data = json.loads(out)  # stdout must be valid JSON, nothing else
         self.assertEqual(data[0]["name"], "a")
         self.assertIn("status", data[0])
@@ -302,7 +339,7 @@ class JsonOutputTests(unittest.TestCase):
         path = Path(tempfile.mktemp(suffix=".toml"))
         TomlManifestStore(path).save(Manifest(tools=(tool(name="a", platforms=("macos",)),)))
         engine = self._engine(path)
-        out = self._capture(lambda: engine.why("a", as_json=True))
+        out = _capture_stdout(lambda: engine.why("a", as_json=True))
         report = json.loads(out)
         self.assertTrue(report["targeted"])
         self.assertEqual(report["resolved"]["manager"], "brew")
@@ -312,7 +349,7 @@ class JsonOutputTests(unittest.TestCase):
         path = Path(tempfile.mktemp(suffix=".toml"))
         TomlManifestStore(path).save(Manifest(tools=(tool(manager="brew", platforms=("macos",)),)))
         engine = self._engine(path)  # _NoManagers => brew is unknown here
-        report = json.loads(self._capture(lambda: engine.doctor(as_json=True)))
+        report = json.loads(_capture_stdout(lambda: engine.doctor(as_json=True)))
         self.assertIn("managers", report)
         self.assertIn("ok", report)
         self.assertFalse(report["ok"])  # unknown manager is a manifest problem
@@ -324,9 +361,9 @@ class JsonOutputTests(unittest.TestCase):
             Manifest(tools=(tool(name="a", tags=("core",)), tool(name="b", tags=("dev",))))
         )
         engine = self._engine(path)
-        every = json.loads(self._capture(lambda: engine.list_tools(as_json=True)))
+        every = json.loads(_capture_stdout(lambda: engine.list_tools(as_json=True)))
         self.assertEqual({t["name"] for t in every}, {"a", "b"})
-        core = json.loads(self._capture(lambda: engine.list_tools({"core"}, as_json=True)))
+        core = json.loads(_capture_stdout(lambda: engine.list_tools({"core"}, as_json=True)))
         self.assertEqual([t["name"] for t in core], ["a"])
 
 
@@ -393,6 +430,131 @@ class CompletionTests(unittest.TestCase):
         from engine.completion import completion_script
 
         self.assertIsNone(completion_script("fish"))
+
+
+class _StubManager(PackageManager):
+    """A controllable manager: reports a fixed installed version and records installs."""
+
+    def __init__(self, runner, *, name, installs_exact_version, current):
+        super().__init__(runner)
+        self.name = name
+        self.installs_exact_version = installs_exact_version
+        self._current = current
+        self.installs: list[str] = []
+
+    def is_available(self): return True
+    def is_installed(self, tool): return True
+    def installed_version(self, tool): return self._current
+    def latest_version(self, tool): return self._current
+    def install(self, tool):
+        self.installs.append(tool.name)
+        return CommandResult(0, "", "")
+    def update(self, tool): return CommandResult(0, "", "")
+    def uninstall(self, tool): return CommandResult(0, "", "")
+    def pin(self, tool): return CommandResult(0, "", "")
+
+
+class _OneManager:
+    def __init__(self, manager): self._manager = manager
+    def get(self, name): return self._manager if name == self._manager.name else None
+    def all(self): return [self._manager]
+
+
+class PinThrashTests(unittest.TestCase):
+    """sync must not reinstall a tool whose pin the manager can never satisfy."""
+
+    def _engine(self, manager):
+        from engine.services import Engine
+
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        # rg pinned to 14.0.0 via the manager named to match the stub.
+        TomlManifestStore(path).save(
+            Manifest(tools=(tool(manager=manager.name, version="14.0.0", platforms=("macos",)),))
+        )
+        return Engine(
+            manifest_store=TomlManifestStore(path),
+            lock_store=JsonLockStore(Path(tempfile.mktemp())),
+            managers=_OneManager(manager),
+            runner=FakeRunner(),
+            console=_SilentConsole(),
+            clock=_FixedClock(),
+            platform="macos",
+        )
+
+    def test_unsatisfiable_pin_is_not_reinstalled(self):
+        mgr = _StubManager(FakeRunner(), name="brewish", installs_exact_version=False, current="15.0.0")
+        outcome = self._engine(mgr).sync(assume_yes=True)
+        self.assertTrue(outcome.ok)
+        self.assertEqual(mgr.installs, [])  # no thrash
+
+    def test_satisfiable_pin_drift_does_reinstall(self):
+        mgr = _StubManager(FakeRunner(), name="cargoish", installs_exact_version=True, current="15.0.0")
+        self._engine(mgr).sync(assume_yes=True)
+        self.assertEqual(mgr.installs, ["rg"])  # drift gets fixed
+
+
+class _HealthRunner(CommandRunner):
+    """Runner that fails any bash command containing ``fail_marker`` (read-only probes)."""
+
+    def __init__(self, fail_marker: str):
+        self.fail_marker = fail_marker
+        self.ran: list[str] = []
+
+    def run(self, args, *, capture=True, read_only=False, env=None):
+        cmd = args[2] if len(args) > 2 else ""
+        self.ran.append(cmd)
+        return CommandResult(1 if self.fail_marker in cmd else 0, "", "")
+
+    def which(self, program):
+        return "/usr/bin/" + program
+
+
+class DoctorHealthCheckTests(unittest.TestCase):
+    def test_doctor_runs_health_check_not_post_install(self):
+        from engine.services import Engine
+
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        TomlManifestStore(path).save(
+            Manifest(tools=(tool(name="rg", manager="brewish", platforms=("macos",),
+                                 post_install="should-not-run", health_check="HEALTHCMD"),))
+        )
+        runner = _HealthRunner(fail_marker="HEALTHCMD")
+        mgr = _StubManager(FakeRunner(), name="brewish", installs_exact_version=False, current="14.1.0")
+        report = json.loads(_capture_stdout(lambda: Engine(
+            manifest_store=TomlManifestStore(path),
+            lock_store=JsonLockStore(Path(tempfile.mktemp())),
+            managers=_OneManager(mgr),
+            runner=runner,
+            console=_SilentConsole(),
+            clock=_FixedClock(),
+            platform="macos",
+        ).doctor(as_json=True)))
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["health_failures"][0]["check"], "HEALTHCMD")
+        self.assertNotIn("should-not-run", runner.ran)  # post_install was not used
+
+
+class CommandRegistryTests(unittest.TestCase):
+    # A valid argv for each command (positionals filled in) — every registered
+    # command must parse and resolve, so a missing wire fails loudly here.
+    _ARGV = {
+        "bootstrap": ["bootstrap"], "sync": ["sync"], "list": ["list"], "status": ["status"],
+        "update": ["update"], "add": ["add", "x"], "remove": ["remove", "x"], "pin": ["pin", "x"],
+        "unpin": ["unpin", "x"], "doctor": ["doctor"], "export": ["export"],
+        "config": ["config", "list"], "why": ["why", "x"], "completion": ["completion", "bash"],
+    }
+
+    def test_every_command_parses_and_resolves(self):
+        from engine.__main__ import build_parser
+        from engine.commands import COMMANDS, COMMANDS_BY_NAME
+
+        names = {c.name for c in COMMANDS}
+        self.assertEqual(set(self._ARGV), names)  # argv table must cover the registry
+        parser = build_parser()
+        for name, argv in self._ARGV.items():
+            parsed = parser.parse_args(argv)
+            self.assertEqual(parsed.command, name)
+            self.assertTrue(callable(COMMANDS_BY_NAME[name].run))
 
 
 class DryRunnerTests(unittest.TestCase):

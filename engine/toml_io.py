@@ -32,6 +32,7 @@ _HEADER = """\
 #   platforms    where it applies: any of ["macos", "linux", "wsl"]
 #   tags         freeform groups for subset installs e.g. ["core", "dev"]
 #   pre_install  / post_install   optional shell hooks (post doubles as a health check)
+#   health_check optional command `doctor` runs to verify health (falls back to post_install)
 #
 # Per-platform overrides (different package name per OS) go in a sub-table:
 #   [tools.fd.overrides.linux]
@@ -56,6 +57,9 @@ class TomlManifestStore(ManifestStore):
 
     def exists(self) -> bool:
         return self.path.exists()
+
+    def render(self, tool: Tool) -> str:
+        return _render_tool(tool)
 
     def load(self) -> Manifest:
         with self.path.open("rb") as handle:
@@ -103,6 +107,7 @@ def _parse_tool(name: str, body: dict) -> Tool:
         tags=tuple(body.get("tags", ())),
         pre_install=_opt(body.get("pre_install")),
         post_install=_opt(body.get("post_install")),
+        health_check=_opt(body.get("health_check")),
         options=dict(body.get("options", {})),
         env={str(k): str(v) for k, v in body.get("env", {}).items()},
         overrides=overrides,
@@ -130,6 +135,8 @@ def _render_tool(tool: Tool) -> str:
         lines.append(f"pre_install = {_v(tool.pre_install)}")
     if tool.post_install:
         lines.append(f"post_install = {_v(tool.post_install)}")
+    if tool.health_check:
+        lines.append(f"health_check = {_v(tool.health_check)}")
     block = "\n".join(lines)
 
     if tool.options:

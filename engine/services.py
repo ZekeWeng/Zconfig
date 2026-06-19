@@ -29,6 +29,7 @@ from .domain import (
     is_valid_tool_name,
     replace_tool_version,
     validate_manifest,
+    version_matches,
 )
 from .ports import Clock, CommandRunner, Console, LockStore, ManagerProvider, ManifestStore
 
@@ -44,11 +45,15 @@ _STATUS_COLORS = {
     Status.PINNED.value: "green",
     Status.MISSING.value: "red",
     Status.PIN_DRIFT.value: "red",
+    Status.PIN_UNSATISFIABLE.value: "red",
     Status.ORPHAN.value: "red",
     Status.OUTDATED.value: "yellow",
     Status.UNKNOWN.value: "dim",
-    Status.SKIPPED.value: "dim",
 }
+
+# The statuses `sync` can converge by (re)installing. Single source so the sync
+# loop and the drift summary agree on what "run sync" will actually fix.
+_SYNC_FIXES = (Status.MISSING, Status.PIN_DRIFT)
 
 
 class Engine:
@@ -85,7 +90,7 @@ class Engine:
             tools = tuple(t for t in tools if tags & set(t.tags))
         return tools
 
-    def _assess(self, tools: tuple[ResolvedTool, ...], lock: Lock) -> list[Assessment]:
+    def _assess(self, tools: tuple[ResolvedTool, ...]) -> list[Assessment]:
         results = []
         for tool in tools:
             manager = self.managers.get(tool.manager)
@@ -101,7 +106,7 @@ class Engine:
                 )
                 continue
             obs = manager.observe(tool)
-            results.append(assess(tool, obs, lock.get(tool.name) is not None))
+            results.append(assess(tool, obs, pin_exact_supported=manager.installs_exact_version))
         return results
 
     def _run_hook(self, hook: str | None, name: str) -> bool:
@@ -131,7 +136,7 @@ class Engine:
         manifest = self.manifest_store.load()
         lock = self.lock_store.load()
         tools = self._resolved(tags)
-        results = self._assess(tools, lock)
+        results = self._assess(tools)
         orphans = find_orphans(manifest, lock)
 
         if as_json:
@@ -179,7 +184,7 @@ class Engine:
         self.console.info("Summary: " + ", ".join(parts))
         if counts.get(Status.OUTDATED.value):
             self.console.info("Run `zconfig update` to review outdated tools.")
-        if counts.get(Status.MISSING.value) or counts.get(Status.PIN_DRIFT.value) or orphans:
+        if orphans or any(counts.get(s.value) for s in _SYNC_FIXES):
             self.console.info("Run `zconfig sync` to converge to the manifest.")
 
     # ── list ──────────────────────────────────────────────────────────
@@ -230,14 +235,14 @@ class Engine:
         manifest = self.manifest_store.load()
         lock = self.lock_store.load()
         tools = self._resolved(tags)
-        results = self._assess(tools, lock)
+        results = self._assess(tools)
         by_name = {t.name: t for t in tools}
 
         installed, skipped = 0, 0
         failures: list[str] = []
         manual_steps: list[tuple[str, str]] = []
         for a in results:
-            if a.status in (Status.MISSING, Status.PIN_DRIFT):
+            if a.status in _SYNC_FIXES:
                 tool = by_name[a.name]
                 manager = self.managers.get(tool.manager)
                 if manager is not None and manager.name == "manual":
@@ -249,6 +254,12 @@ class Engine:
                     installed += 1
                 else:
                     failures.append(a.name)
+            elif a.status == Status.PIN_UNSATISFIABLE:
+                self.console.warn(
+                    f"  {a.name}: {a.manager} cannot install pinned {a.desired_version} "
+                    f"(have {a.current or '?'}) — pin to the installed version or unpin"
+                )
+                skipped += 1
             elif a.status == Status.UNKNOWN:
                 self.console.warn(f"  {a.name}: manager '{a.manager}' unavailable — skipped")
                 skipped += 1
@@ -346,7 +357,7 @@ class Engine:
     def update(self, tags: set[str] | None = None) -> Outcome:
         lock = self.lock_store.load()
         tools = self._resolved(tags)
-        results = self._assess(tools, lock)
+        results = self._assess(tools)
         by_name = {t.name: t for t in tools}
         outdated = [a for a in results if a.status == Status.OUTDATED]
 
@@ -457,18 +468,24 @@ class Engine:
             self.console.error(f"{name} is not in the manifest.")
             return Outcome(ok=False)
         resolved = tool.resolve(self.platform)
+        manager = self.managers.get(resolved.manager) if resolved else None
+        installed = manager.installed_version(resolved) if manager and resolved else None
         if version is None:
-            manager = self.managers.get(resolved.manager) if resolved else None
-            version = (manager.installed_version(resolved) if manager and resolved else None)
+            version = installed
             if not version:
                 self.console.error(f"Cannot detect an installed version of {name}; pass one explicitly.")
                 return Outcome(ok=False)
+        # An explicit pin a manager can't reach would loop as pin-unsatisfiable
+        # forever — warn now, at the point the state is created.
+        if manager and not manager.installs_exact_version and installed and not version_matches(installed, version):
+            self.console.warn(
+                f"{resolved.manager} cannot install exact versions; {name} will report "
+                f"pin-unsatisfiable until {version} is what's installed (have {installed})."
+            )
         manifest = manifest.with_tool(replace_tool_version(manifest.get(name), version))
         self._save_manifest(manifest)
-        if resolved:
-            manager = self.managers.get(resolved.manager)
-            if manager and manager.is_available():
-                manager.pin(resolved)
+        if manager and manager.is_available():
+            manager.pin(resolved)
         lock = self.lock_store.load()
         entry = lock.get(name)
         if entry:
@@ -593,7 +610,7 @@ class Engine:
         else:
             obs = manager.observe(resolved)
             report["state"] = {
-                "status": assess(resolved, obs, entry is not None).status.value,
+                "status": assess(resolved, obs).status.value,
                 "current": obs.current,
                 "latest": obs.latest,
             }
@@ -664,9 +681,9 @@ class Engine:
             manager = self.managers.get(tool.manager)
             if manager is None or not manager.is_available():
                 continue  # config errors covered by manifest_problems; absence is environmental
-            if manager.is_installed(tool) and tool.post_install:
-                if not self.runner.run(["bash", "-c", tool.post_install], read_only=True).ok:
-                    report["health_failures"].append({"tool": tool.name, "check": tool.post_install})
+            check = tool.health_command
+            if manager.is_installed(tool) and check and not self.runner.run(["bash", "-c", check], read_only=True).ok:
+                report["health_failures"].append({"tool": tool.name, "check": check})
         report["ok"] = not report["manifest_problems"] and not report["health_failures"]
         return report
 
@@ -720,11 +737,9 @@ class Engine:
             self._save_manifest(manifest)
             self.console.ok(f"Merged {added} new tool(s) into the manifest ({len(discovered) - added} already present).")
         else:
-            from .toml_io import _render_tool  # render-only, no file write
-
             self.console.info(f"# {len(discovered)} installed tool(s) — review and merge as desired:")
             for tool in sorted(discovered, key=lambda t: t.name):
-                print(_render_tool(tool))
+                print(self.manifest_store.render(tool))
         return Outcome()
 
     # ── bootstrap ─────────────────────────────────────────────────────

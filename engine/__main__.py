@@ -15,8 +15,8 @@ import tomllib
 from pathlib import Path
 
 from . import __version__
+from .commands import COMMANDS, COMMANDS_BY_NAME
 from .console import TerminalConsole
-from .domain import KNOWN_PLATFORMS, LATEST, Tool
 from .lockfile import JsonLockStore
 from .managers import Registry
 from .platform import SystemClock, detect_platform
@@ -94,42 +94,11 @@ def _resolve_platform(store: TomlManifestStore) -> str:
     return detect_platform()
 
 
-def _tags(value: str | None) -> set[str] | None:
-    return {t.strip() for t in value.split(",") if t.strip()} if value else None
-
-
 def _require_manifest(engine: Engine, console: TerminalConsole) -> bool:
     if not engine.manifest_store.exists():
         console.error(f"No manifest found at {engine.manifest_store.path}. Create software.toml first.")
         return False
     return True
-
-
-def _cmd_add(engine: Engine, args: argparse.Namespace) -> int:
-    console = engine.console
-    manager = args.manager
-    package = args.package
-    interactive = sys.stdin.isatty()
-    if not manager and interactive:
-        manager = input(f"manager {Registry.known_names()}: ").strip()
-    if not package and interactive:
-        package = input(f"package [{args.name}]: ").strip() or args.name
-    if not manager or not package:
-        console.error("add requires --manager and --package (or an interactive terminal).")
-        return 1
-    if manager not in Registry.known_names():
-        console.error(f"unknown manager '{manager}'. Known: {', '.join(Registry.known_names())}")
-        return 1
-    tool = Tool(
-        name=args.name,
-        manager=manager,
-        package=package,
-        version=args.version or LATEST,
-        platforms=tuple(args.platforms.split(",")) if args.platforms else KNOWN_PLATFORMS,
-        tags=tuple(t for t in (args.tags or "").split(",") if t),
-        post_install=args.post_install,
-    )
-    return 0 if engine.add(tool, install_now=args.install).ok else 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -139,78 +108,25 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--lock", help="path to zconfig.lock (default: $ZCONFIG_DIR/zconfig.lock)")
     parser.add_argument("--log-file", help="path to the run log (default: $ZCONFIG_DIR/.zconfig.log)")
     sub = parser.add_subparsers(dest="command", required=True)
-
-    def with_common(p, *, tags=True, yes=True, dry=True):
-        if tags:
-            p.add_argument("--tags", help="comma-separated tags to filter (e.g. core,dev)")
-        if yes:
-            p.add_argument("--yes", action="store_true", help="assume yes for all prompts")
-        if dry:
-            p.add_argument("--dry-run", action="store_true", help="show actions without changing anything")
-        return p
-
-    with_common(sub.add_parser("bootstrap", help="install prerequisites then sync"))
-    with_common(sub.add_parser("sync", help="converge the machine to the manifest"))
-    p_list = with_common(sub.add_parser("list", help="list declared tools (no live probing)"), yes=False, dry=False)
-    p_list.add_argument("--json", action="store_true", help="emit JSON on stdout instead of a table")
-
-    p_status = with_common(sub.add_parser("status", help="show drift vs the manifest"), yes=False, dry=False)
-    p_status.add_argument("--json", action="store_true", help="emit JSON on stdout instead of a table")
-    with_common(sub.add_parser("update", help="interactively update outdated tools"), yes=False)
-    p_doctor = with_common(sub.add_parser("doctor", help="check environment health"), tags=False, yes=False, dry=False)
-    p_doctor.add_argument("--json", action="store_true", help="emit JSON on stdout")
-
-    p_add = with_common(sub.add_parser("add", help="add a tool to the manifest"), tags=False)
-    p_add.add_argument("name")
-    p_add.add_argument("--manager")
-    p_add.add_argument("--package")
-    p_add.add_argument("--version")
-    p_add.add_argument("--platforms", help="comma-separated: macos,linux,wsl")
-    p_add.add_argument("--add-tags", dest="tags", help="comma-separated tags")
-    p_add.add_argument("--post-install", help="post-install health-check command")
-    p_add.add_argument("--install", action="store_true", help="install immediately after adding")
-
-    p_remove = with_common(sub.add_parser("remove", help="uninstall and drop a tool"), tags=False)
-    p_remove.add_argument("name")
-
-    p_pin = with_common(sub.add_parser("pin", help="pin a tool to a version"), tags=False, yes=False, dry=False)
-    p_pin.add_argument("name")
-    p_pin.add_argument("version", nargs="?", help="version to pin (default: currently installed)")
-
-    p_unpin = with_common(sub.add_parser("unpin", help="unpin a tool (track latest)"), tags=False, yes=False, dry=False)
-    p_unpin.add_argument("name")
-
-    p_export = with_common(sub.add_parser("export", help="snapshot installed software as manifest entries"), tags=False, yes=False, dry=False)
-    p_export.add_argument("--write", action="store_true", help="merge discoveries into the manifest")
-
-    p_config = sub.add_parser("config", help="view or edit the [settings] table")
-    p_config.add_argument("action", choices=["list", "get", "set", "unset"])
-    p_config.add_argument("key", nargs="?", help="default_tags | default_platform")
-    p_config.add_argument("value", nargs="?", help="value for `set`")
-
-    p_why = sub.add_parser("why", help="explain how a tool resolves and its live state")
-    p_why.add_argument("name")
-    p_why.add_argument("--json", action="store_true", help="emit JSON on stdout")
-
-    p_comp = sub.add_parser("completion", help="print a shell completion script (bash|zsh)")
-    p_comp.add_argument("shell", choices=["bash", "zsh"])
+    for command in COMMANDS:
+        command.configure(sub.add_parser(command.name, help=command.help))
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    command = COMMANDS_BY_NAME[args.command]
 
     # completion needs no engine or manifest — print and exit.
-    if args.command == "completion":
-        from .completion import completion_script
-
-        print(completion_script(args.shell), end="")
-        return 0
+    if not command.needs_engine:
+        return command.run(None, args)
 
     engine = _build_engine(args)
     console = engine.console
     try:
-        return _dispatch(engine, args, console)
+        if command.needs_manifest and not _require_manifest(engine, console):
+            return 1
+        return command.run(engine, args)
     except tomllib.TOMLDecodeError as exc:
         # A typo in software.toml is common — give a clear error, not a traceback.
         console.error(f"{engine.manifest_store.path}: invalid TOML — {exc}")
@@ -218,42 +134,6 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as exc:
         console.error(f"file error: {exc}")
         return 1
-
-
-def _dispatch(engine: Engine, args: argparse.Namespace, console: TerminalConsole) -> int:
-    if args.command == "add":
-        return _cmd_add(engine, args)
-
-    # Every other command reads the manifest first.
-    if not _require_manifest(engine, console):
-        return 1
-
-    if args.command == "list":
-        return 0 if engine.list_tools(_tags(args.tags), as_json=args.json).ok else 1
-    if args.command == "status":
-        return 0 if engine.status(_tags(args.tags), as_json=args.json).ok else 1
-    if args.command == "sync":
-        return 0 if engine.sync(_tags(args.tags), assume_yes=args.yes).ok else 1
-    if args.command == "bootstrap":
-        return 0 if engine.bootstrap(_tags(args.tags), assume_yes=args.yes).ok else 1
-    if args.command == "update":
-        return 0 if engine.update(_tags(args.tags)).ok else 1
-    if args.command == "remove":
-        return 0 if engine.remove(args.name, assume_yes=args.yes).ok else 1
-    if args.command == "pin":
-        return 0 if engine.pin(args.name, args.version).ok else 1
-    if args.command == "unpin":
-        return 0 if engine.unpin(args.name).ok else 1
-    if args.command == "doctor":
-        return 0 if engine.doctor(as_json=args.json).ok else 1
-    if args.command == "export":
-        return 0 if engine.export(write=args.write).ok else 1
-    if args.command == "config":
-        return 0 if engine.config(args.action, args.key, args.value).ok else 1
-    if args.command == "why":
-        return 0 if engine.why(args.name, as_json=args.json).ok else 1
-    console.error(f"unknown command: {args.command}")
-    return 2
 
 
 if __name__ == "__main__":
