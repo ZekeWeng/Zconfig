@@ -53,6 +53,10 @@ jobs:
         # runner has no tools installed (ok would be false), so assert the gate
         # *contract* instead: valid JSON exposing a boolean .ok plus the
         # documented arrays. This catches regressions to the gate's shape.
+        # ZCONFIG_DIR points the engine at this checkout's software.toml (and lock
+        # / log), mirroring how the engine resolves paths in a real ~/.zconfig.
+        env:
+          ZCONFIG_DIR: ${{ github.workspace }}
         run: |
           PYTHONPATH=. python3 -m engine doctor --json \
             | jq -e '(.ok | type == "boolean")
