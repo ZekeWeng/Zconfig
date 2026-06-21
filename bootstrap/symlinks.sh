@@ -22,6 +22,7 @@ ZCONFIG_SYMLINKS_CORP=(
 ZCONFIG_SYMLINKS=(
     "${ZCONFIG_SYMLINKS_CORP[@]}"
     "tools/editor/neovim/config::.config/nvim"
+    "tools/terminal/ghostty/config/config::.config/ghostty/config"
     "tools/workflow/git/config/.gitconfig::.gitconfig"
     "tools/workflow/git/config/.gitignore_global::.gitignore_global"
 )
