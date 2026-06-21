@@ -11,8 +11,8 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, replace
 
 from .domain import (
     KNOWN_PLATFORMS,
@@ -163,7 +163,9 @@ class Engine:
             for a in sorted(results, key=lambda a: (a.status.value, a.name))
         ]
         for orphan in sorted(orphans, key=lambda e: e.name):
-            rows.append([orphan.name, orphan.manager, Status.ORPHAN.value, orphan.version, "(remove)"])
+            rows.append(
+                [orphan.name, orphan.manager, Status.ORPHAN.value, orphan.version, "(remove)"]
+            )
 
         if not rows:
             self.console.info("No tools declared for this platform.")
@@ -174,7 +176,9 @@ class Engine:
         self._print_drift_summary(results, orphans)
         return Outcome()
 
-    def _print_drift_summary(self, results: list[Assessment], orphans) -> None:
+    def _print_drift_summary(
+        self, results: list[Assessment], orphans: tuple[LockEntry, ...]
+    ) -> None:
         counts: dict[str, int] = {}
         for a in results:
             counts[a.status.value] = counts.get(a.status.value, 0) + 1
@@ -264,12 +268,16 @@ class Engine:
                 self.console.warn(f"  {a.name}: manager '{a.manager}' unavailable — skipped")
                 skipped += 1
 
-        removed = self._remove_orphans(manifest, lock, assume_yes=assume_yes)
-        lock = removed[1]
+        removed_count, lock = self._remove_orphans(manifest, lock, assume_yes=assume_yes)
         self._save_lock(lock)
 
         outdated = sum(1 for a in results if a.status == Status.OUTDATED)
-        parts = [f"{installed} installed", f"{removed[0]} removed", f"{len(failures)} failed", f"{skipped} skipped"]
+        parts = [
+            f"{installed} installed",
+            f"{removed_count} removed",
+            f"{len(failures)} failed",
+            f"{skipped} skipped",
+        ]
         if manual_steps:
             parts.append(f"{len(manual_steps)} manual")
         self.console.ok("Sync complete: " + ", ".join(parts) + ".")
@@ -316,7 +324,9 @@ class Engine:
                 return True
 
             if not manager.is_installed(tool):
-                self.console.error(f"  {tool.name}: install reported success but tool is still missing")
+                self.console.error(
+                    f"  {tool.name}: install reported success but tool is still missing"
+                )
                 return False
             if not self._run_hook(tool.post_install, tool.name):
                 return False
@@ -345,7 +355,9 @@ class Engine:
             if manager and manager.is_available():
                 result = manager.uninstall(tool)
                 if not result.ok and not self.dry_run:
-                    self.console.error(f"  {orphan.name}: uninstall failed: {result.stderr.strip()}")
+                    self.console.error(
+                        f"  {orphan.name}: uninstall failed: {result.stderr.strip()}"
+                    )
                     continue
             lock = lock.remove(orphan.name)
             removed += 1
@@ -370,10 +382,14 @@ class Engine:
         for a in outdated:
             tool = by_name[a.name]
             label = f"{a.name}: {a.current or '?'} -> {a.latest or 'latest'}"
-            choice = "u" if update_all else self.console.choose(
-                f"Update {label}?",
-                {"u": "pdate", "s": "kip", "p": "in current", "a": "ll"},
-                default="s",
+            choice = (
+                "u"
+                if update_all
+                else self.console.choose(
+                    f"Update {label}?",
+                    {"u": "pdate", "s": "kip", "p": "in current", "a": "ll"},
+                    default="s",
+                )
             )
             if choice == "a":
                 update_all = True
@@ -382,8 +398,11 @@ class Engine:
                 if self._provision(tool, action="update"):
                     lock = lock.upsert(self._lock_entry(tool))
             elif choice == "p":
+                declared = manifest.get(a.name)
+                if declared is None:
+                    continue
                 pinned_version = a.current or LATEST
-                manifest = manifest.with_tool(replace_tool_version(manifest.get(a.name), pinned_version))
+                manifest = manifest.with_tool(replace_tool_version(declared, pinned_version))
                 self._save_manifest(manifest)
                 manager = self.managers.get(tool.manager)
                 if manager:
@@ -473,18 +492,25 @@ class Engine:
         if version is None:
             version = installed
             if not version:
-                self.console.error(f"Cannot detect an installed version of {name}; pass one explicitly.")
+                self.console.error(
+                    f"Cannot detect an installed version of {name}; pass one explicitly."
+                )
                 return Outcome(ok=False)
         # An explicit pin a manager can't reach would loop as pin-unsatisfiable
         # forever — warn now, at the point the state is created.
-        if manager and not manager.installs_exact_version and installed and not version_matches(installed, version):
+        if (
+            manager
+            and not manager.installs_exact_version
+            and installed
+            and not version_matches(installed, version)
+        ):
             self.console.warn(
-                f"{resolved.manager} cannot install exact versions; {name} will report "
+                f"{manager.name} cannot install exact versions; {name} will report "
                 f"pin-unsatisfiable until {version} is what's installed (have {installed})."
             )
-        manifest = manifest.with_tool(replace_tool_version(manifest.get(name), version))
+        manifest = manifest.with_tool(replace_tool_version(tool, version))
         self._save_manifest(manifest)
-        if manager and manager.is_available():
+        if resolved and manager and manager.is_available():
             manager.pin(resolved)
         lock = self.lock_store.load()
         entry = lock.get(name)
@@ -511,7 +537,7 @@ class Engine:
         if tool is None:
             self.console.error(f"{name} is not in the manifest.")
             return Outcome(ok=False)
-        manifest = manifest.with_tool(replace_tool_version(manifest.get(name), LATEST))
+        manifest = manifest.with_tool(replace_tool_version(tool, LATEST))
         self._save_manifest(manifest)
         self.console.ok(f"Unpinned {name} — it now tracks latest.")
         self.console.info("apt/brew holds are not auto-released; unhold manually if needed.")
@@ -521,8 +547,6 @@ class Engine:
 
     def config(self, action: str, key: str | None = None, value: str | None = None) -> Outcome:
         """View or edit the manifest's [settings] table from the CLI."""
-        from dataclasses import replace
-
         settings = self.manifest_store.load().settings
         current = {
             "default_tags": ",".join(settings.default_tags),
@@ -530,9 +554,7 @@ class Engine:
         }
 
         if action == "list":
-            self.console.table(
-                ["KEY", "VALUE"], [[k, v or "-"] for k, v in current.items()]
-            )
+            self.console.table(["KEY", "VALUE"], [[k, v or "-"] for k, v in current.items()])
             return Outcome()
         if key not in current:
             self.console.error(f"Unknown setting '{key}'. Known: {', '.join(current)}")
@@ -551,7 +573,9 @@ class Engine:
         if key == "default_tags":
             new = replace(
                 settings,
-                default_tags=tuple(t for t in (value or "").split(",") if t) if action == "set" else (),
+                default_tags=tuple(t for t in (value or "").split(",") if t)
+                if action == "set"
+                else (),
             )
         else:
             new = replace(settings, default_platform=value if action == "set" else None)
@@ -610,12 +634,18 @@ class Engine:
         else:
             obs = manager.observe(resolved)
             report["state"] = {
-                "status": assess(resolved, obs).status.value,
+                "status": assess(
+                    resolved, obs, pin_exact_supported=manager.installs_exact_version
+                ).status.value,
                 "current": obs.current,
                 "latest": obs.latest,
             }
         report["lock"] = (
-            {"installed_by_zconfig": True, "installed_at": entry.installed_at, "pinned": entry.pinned}
+            {
+                "installed_by_zconfig": True,
+                "installed_at": entry.installed_at,
+                "pinned": entry.pinned,
+            }
             if entry
             else {"installed_by_zconfig": False}
         )
@@ -682,7 +712,11 @@ class Engine:
             if manager is None or not manager.is_available():
                 continue  # config errors covered by manifest_problems; absence is environmental
             check = tool.health_command
-            if manager.is_installed(tool) and check and not self.runner.run(["bash", "-c", check], read_only=True).ok:
+            if (
+                manager.is_installed(tool)
+                and check
+                and not self.runner.run(["bash", "-c", check], read_only=True).ok
+            ):
                 report["health_failures"].append({"tool": tool.name, "check": check})
         report["ok"] = not report["manifest_problems"] and not report["health_failures"]
         return report
@@ -698,7 +732,10 @@ class Engine:
         for failure in report["health_failures"]:
             self.console.error(f"  {failure['tool']}: health check failed ({failure['check']})")
         if report["orphans"]:
-            self.console.warn(f"{len(report['orphans'])} orphaned tool(s) in the lock: " + ", ".join(report["orphans"]))
+            self.console.warn(
+                f"{len(report['orphans'])} orphaned tool(s) in the lock: "
+                + ", ".join(report["orphans"])
+            )
         if report["ok"]:
             self.console.ok("doctor: environment looks healthy.")
         else:
@@ -713,13 +750,17 @@ class Engine:
             if not manager.is_available():
                 continue
             for entry in manager.export_installed():
+                raw_tags = entry.get("tags", ())
+                raw_options = entry.get("options", {})
                 discovered.append(
                     Tool(
                         name=str(entry["name"]),
                         manager=str(entry["manager"]),
                         package=str(entry.get("package", entry["name"])),
-                        tags=tuple(entry.get("tags", ())),
-                        options=dict(entry.get("options", {})),
+                        tags=tuple(str(t) for t in raw_tags)
+                        if isinstance(raw_tags, Iterable)
+                        else (),
+                        options=dict(raw_options) if isinstance(raw_options, Mapping) else {},
                     )
                 )
         if not discovered:
@@ -735,9 +776,13 @@ class Engine:
                     manifest = manifest.with_tool(tool)
                     added += 1
             self._save_manifest(manifest)
-            self.console.ok(f"Merged {added} new tool(s) into the manifest ({len(discovered) - added} already present).")
+            self.console.ok(
+                f"Merged {added} new tool(s) into the manifest ({len(discovered) - added} already present)."
+            )
         else:
-            self.console.info(f"# {len(discovered)} installed tool(s) — review and merge as desired:")
+            self.console.info(
+                f"# {len(discovered)} installed tool(s) — review and merge as desired:"
+            )
             for tool in sorted(discovered, key=lambda t: t.name):
                 print(self.manifest_store.render(tool))
         return Outcome()
@@ -747,7 +792,9 @@ class Engine:
     def bootstrap(self, tags: set[str] | None = None, *, assume_yes: bool = False) -> Outcome:
         brew = self.managers.get("brew")
         if self.platform == "macos" and brew and not brew.is_available():
-            self.console.error("Homebrew is required on macOS but was not found. Install it, then re-run.")
+            self.console.error(
+                "Homebrew is required on macOS but was not found. Install it, then re-run."
+            )
             return Outcome(ok=False)
         self.console.info("Bootstrap: converging machine to the manifest...")
         return self.sync(tags, assume_yes=assume_yes)

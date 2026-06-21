@@ -62,7 +62,7 @@ _zconfig() {
     case "${words[2]}" in
         %(tool_arg_zsh)s)
             local -a tools
-            tools=(${(f)"$(zconfig list --json 2>/dev/null | python3 -c 'import sys,json;[print(t["name"]) for t in json.load(sys.stdin)]' 2>/dev/null)"})
+            tools=(${(f)"$(zconfig list --json 2>/dev/null | python3 -c 'import sys,json; print("\\n".join(t["name"] for t in json.load(sys.stdin)))' 2>/dev/null)"})
             _describe 'tool' tools ;;
         config) _values 'arg' list get set unset default_tags default_platform ;;
         completion) _values 'shell' bash zsh ;;

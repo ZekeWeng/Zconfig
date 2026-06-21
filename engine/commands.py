@@ -29,7 +29,7 @@ class Command:
     name: str
     help: str
     configure: Callable[[argparse.ArgumentParser], None]
-    run: Callable[[Engine | None, argparse.Namespace], int]
+    run: Callable[[Engine, argparse.Namespace], int]
     needs_engine: bool = True  # completion needs neither engine nor manifest
     needs_manifest: bool = True  # add creates the manifest, so it doesn't require one
     tool_arg: bool = False  # first positional is a tool name (drives completion)
@@ -41,7 +41,9 @@ def _add_common(parser: argparse.ArgumentParser, *, tags=True, yes=True, dry=Tru
     if yes:
         parser.add_argument("--yes", action="store_true", help="assume yes for all prompts")
     if dry:
-        parser.add_argument("--dry-run", action="store_true", help="show actions without changing anything")
+        parser.add_argument(
+            "--dry-run", action="store_true", help="show actions without changing anything"
+        )
 
 
 def _tags(value: str | None) -> set[str] | None:
@@ -53,6 +55,7 @@ def _ok(outcome) -> int:
 
 
 # ── per-command parser configuration ──────────────────────────────────
+
 
 def _cfg_listing(p):
     # Shared by `list` and `status`: tag filter + JSON, no mutation flags.
@@ -118,6 +121,7 @@ def _cfg_completion(p):
 
 # ── handlers ──────────────────────────────────────────────────────────
 
+
 def _run_add(engine, args):
     console = engine.console
     known = Registry.known_names()
@@ -132,6 +136,13 @@ def _run_add(engine, args):
         return 1
     if manager not in known:
         console.error(f"unknown manager '{manager}'. Known: {', '.join(known)}")
+        return 1
+    if args.install and manager == "script":
+        console.error(
+            "add --install can't provision a 'script' tool: it needs an `install` "
+            "command that add does not capture. Add it without --install, define "
+            f"[tools.{args.name}.options].install in software.toml, then run `zconfig sync`."
+        )
         return 1
     tool = Tool(
         name=args.name,
@@ -154,33 +165,90 @@ def _run_completion(_engine, args):
 
 
 COMMANDS: tuple[Command, ...] = (
-    Command("bootstrap", "install prerequisites then sync", _add_common,
-            lambda e, a: _ok(e.bootstrap(_tags(a.tags), assume_yes=a.yes))),
-    Command("sync", "converge the machine to the manifest", _add_common,
-            lambda e, a: _ok(e.sync(_tags(a.tags), assume_yes=a.yes))),
-    Command("list", "list declared tools (no live probing)", _cfg_listing,
-            lambda e, a: _ok(e.list_tools(_tags(a.tags), as_json=a.json))),
-    Command("status", "show drift vs the manifest", _cfg_listing,
-            lambda e, a: _ok(e.status(_tags(a.tags), as_json=a.json))),
-    Command("update", "interactively update outdated tools", _cfg_update,
-            lambda e, a: _ok(e.update(_tags(a.tags)))),
+    Command(
+        "bootstrap",
+        "install prerequisites then sync",
+        _add_common,
+        lambda e, a: _ok(e.bootstrap(_tags(a.tags), assume_yes=a.yes)),
+    ),
+    Command(
+        "sync",
+        "converge the machine to the manifest",
+        _add_common,
+        lambda e, a: _ok(e.sync(_tags(a.tags), assume_yes=a.yes)),
+    ),
+    Command(
+        "list",
+        "list declared tools (no live probing)",
+        _cfg_listing,
+        lambda e, a: _ok(e.list_tools(_tags(a.tags), as_json=a.json)),
+    ),
+    Command(
+        "status",
+        "show drift vs the manifest",
+        _cfg_listing,
+        lambda e, a: _ok(e.status(_tags(a.tags), as_json=a.json)),
+    ),
+    Command(
+        "update",
+        "interactively update outdated tools",
+        _cfg_update,
+        lambda e, a: _ok(e.update(_tags(a.tags))),
+    ),
     Command("add", "add a tool to the manifest", _cfg_add, _run_add, needs_manifest=False),
-    Command("remove", "uninstall and drop a tool", _cfg_remove,
-            lambda e, a: _ok(e.remove(a.name, assume_yes=a.yes)), tool_arg=True),
-    Command("pin", "pin a tool to a version", _cfg_pin,
-            lambda e, a: _ok(e.pin(a.name, a.version)), tool_arg=True),
-    Command("unpin", "unpin a tool (track latest)", _cfg_unpin,
-            lambda e, a: _ok(e.unpin(a.name)), tool_arg=True),
-    Command("doctor", "check environment health", _cfg_doctor,
-            lambda e, a: _ok(e.doctor(as_json=a.json))),
-    Command("export", "snapshot installed software as manifest entries", _cfg_export,
-            lambda e, a: _ok(e.export(write=a.write))),
-    Command("config", "view or edit the [settings] table", _cfg_config,
-            lambda e, a: _ok(e.config(a.action, a.key, a.value))),
-    Command("why", "explain how a tool resolves and its live state", _cfg_why,
-            lambda e, a: _ok(e.why(a.name, as_json=a.json)), tool_arg=True),
-    Command("completion", "print a shell completion script (bash|zsh)", _cfg_completion,
-            _run_completion, needs_engine=False),
+    Command(
+        "remove",
+        "uninstall and drop a tool",
+        _cfg_remove,
+        lambda e, a: _ok(e.remove(a.name, assume_yes=a.yes)),
+        tool_arg=True,
+    ),
+    Command(
+        "pin",
+        "pin a tool to a version",
+        _cfg_pin,
+        lambda e, a: _ok(e.pin(a.name, a.version)),
+        tool_arg=True,
+    ),
+    Command(
+        "unpin",
+        "unpin a tool (track latest)",
+        _cfg_unpin,
+        lambda e, a: _ok(e.unpin(a.name)),
+        tool_arg=True,
+    ),
+    Command(
+        "doctor",
+        "check environment health",
+        _cfg_doctor,
+        lambda e, a: _ok(e.doctor(as_json=a.json)),
+    ),
+    Command(
+        "export",
+        "snapshot installed software as manifest entries",
+        _cfg_export,
+        lambda e, a: _ok(e.export(write=a.write)),
+    ),
+    Command(
+        "config",
+        "view or edit the [settings] table",
+        _cfg_config,
+        lambda e, a: _ok(e.config(a.action, a.key, a.value)),
+    ),
+    Command(
+        "why",
+        "explain how a tool resolves and its live state",
+        _cfg_why,
+        lambda e, a: _ok(e.why(a.name, as_json=a.json)),
+        tool_arg=True,
+    ),
+    Command(
+        "completion",
+        "print a shell completion script (bash|zsh)",
+        _cfg_completion,
+        _run_completion,
+        needs_engine=False,
+    ),
 )
 
 COMMANDS_BY_NAME: dict[str, Command] = {c.name: c for c in COMMANDS}

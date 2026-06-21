@@ -56,7 +56,9 @@ class ScriptManager(PackageManager):
         if not cmd:
             return None
         result = self.runner.run(_bash(cmd), read_only=True)
-        return result.stdout.strip().splitlines()[0] if result.ok and result.stdout.strip() else None
+        return (
+            result.stdout.strip().splitlines()[0] if result.ok and result.stdout.strip() else None
+        )
 
     def latest_version(self, tool: ResolvedTool) -> str | None:
         cmd = self._opt(tool, "latest")

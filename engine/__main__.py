@@ -20,6 +20,7 @@ from .console import TerminalConsole
 from .lockfile import JsonLockStore
 from .managers import Registry
 from .platform import SystemClock, detect_platform
+from .ports import Console
 from .services import Engine
 from .shell import DryRunner, SystemRunner
 from .toml_io import TomlManifestStore
@@ -50,8 +51,20 @@ class _FileLog:
             self.handle.write(message + "\n")
             self.handle.flush()
 
+    def close(self) -> None:
+        if self.handle:
+            with contextlib.suppress(OSError):
+                self.handle.close()
+            self.handle = None
 
-def _build_engine(args: argparse.Namespace) -> Engine:
+    def __enter__(self) -> _FileLog:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+
+def _build_engine(args: argparse.Namespace) -> tuple[Engine, _FileLog]:
     root = _zconfig_dir()
     os.environ.setdefault("ZCONFIG_DIR", str(root))
     manifest_path = Path(args.manifest) if args.manifest else root / "software.toml"
@@ -66,7 +79,7 @@ def _build_engine(args: argparse.Namespace) -> Engine:
         runner = DryRunner(runner, sink=console.info)
 
     manifest_store = TomlManifestStore(manifest_path)
-    return Engine(
+    engine = Engine(
         manifest_store=manifest_store,
         lock_store=JsonLockStore(lock_path),
         managers=Registry(runner),
@@ -76,6 +89,7 @@ def _build_engine(args: argparse.Namespace) -> Engine:
         platform=_resolve_platform(manifest_store),
         dry_run=getattr(args, "dry_run", False),
     )
+    return engine, logger
 
 
 def _resolve_platform(store: TomlManifestStore) -> str:
@@ -94,9 +108,12 @@ def _resolve_platform(store: TomlManifestStore) -> str:
     return detect_platform()
 
 
-def _require_manifest(engine: Engine, console: TerminalConsole) -> bool:
+def _require_manifest(engine: Engine, console: Console) -> bool:
     if not engine.manifest_store.exists():
-        console.error(f"No manifest found at {engine.manifest_store.path}. Create software.toml first.")
+        # .path is a TomlManifestStore detail; the port stays filesystem-agnostic
+        # and the composition root only ever wires that one concrete store.
+        store_path = engine.manifest_store.path  # pyright: ignore[reportAttributeAccessIssue]
+        console.error(f"No manifest found at {store_path}. Create software.toml first.")
         return False
     return True
 
@@ -104,9 +121,13 @@ def _require_manifest(engine: Engine, console: TerminalConsole) -> bool:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="zconfig", description="Declarative software management.")
     parser.add_argument("--version", action="version", version=f"zconfig {__version__}")
-    parser.add_argument("--manifest", help="path to software.toml (default: $ZCONFIG_DIR/software.toml)")
+    parser.add_argument(
+        "--manifest", help="path to software.toml (default: $ZCONFIG_DIR/software.toml)"
+    )
     parser.add_argument("--lock", help="path to zconfig.lock (default: $ZCONFIG_DIR/zconfig.lock)")
-    parser.add_argument("--log-file", help="path to the run log (default: $ZCONFIG_DIR/.zconfig.log)")
+    parser.add_argument(
+        "--log-file", help="path to the run log (default: $ZCONFIG_DIR/.zconfig.log)"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
     for command in COMMANDS:
         command.configure(sub.add_parser(command.name, help=command.help))
@@ -117,11 +138,12 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     command = COMMANDS_BY_NAME[args.command]
 
-    # completion needs no engine or manifest — print and exit.
+    # completion needs no engine or manifest — print and exit. Its handler
+    # ignores the engine arg, so passing None here is intentional.
     if not command.needs_engine:
-        return command.run(None, args)
+        return command.run(None, args)  # pyright: ignore[reportArgumentType]
 
-    engine = _build_engine(args)
+    engine, logger = _build_engine(args)
     console = engine.console
     try:
         if command.needs_manifest and not _require_manifest(engine, console):
@@ -129,11 +151,15 @@ def main(argv: list[str] | None = None) -> int:
         return command.run(engine, args)
     except tomllib.TOMLDecodeError as exc:
         # A typo in software.toml is common — give a clear error, not a traceback.
-        console.error(f"{engine.manifest_store.path}: invalid TOML — {exc}")
+        # .path is a TomlManifestStore detail (see _require_manifest).
+        store_path = engine.manifest_store.path  # pyright: ignore[reportAttributeAccessIssue]
+        console.error(f"{store_path}: invalid TOML — {exc}")
         return 1
     except OSError as exc:
         console.error(f"file error: {exc}")
         return 1
+    finally:
+        logger.close()
 
 
 if __name__ == "__main__":

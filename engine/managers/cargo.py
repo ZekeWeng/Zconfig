@@ -63,5 +63,8 @@ class CargoManager(PackageManager):
 
     def pin(self, tool: ResolvedTool) -> CommandResult:
         if tool.is_pinned:
-            return self.runner.run(["cargo", "install", tool.package, "--version", tool.version, "--force"], capture=False)
+            return self.runner.run(
+                ["cargo", "install", tool.package, "--version", tool.version, "--force"],
+                capture=False,
+            )
         return CommandResult(0, "", "cargo has no hold; pin enforced by manifest version")

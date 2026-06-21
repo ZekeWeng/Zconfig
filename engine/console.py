@@ -10,6 +10,8 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 
+from .ports import Console
+
 _RED = "\033[0;31m"
 _GREEN = "\033[0;32m"
 _YELLOW = "\033[1;33m"
@@ -20,8 +22,10 @@ _NC = "\033[0m"
 _NAMED = {"red": _RED, "green": _GREEN, "yellow": _YELLOW, "dim": _DIM}
 
 
-class TerminalConsole:
-    def __init__(self, *, log: Callable[[str], None] | None = None, assume_yes: bool = False) -> None:
+class TerminalConsole(Console):
+    def __init__(
+        self, *, log: Callable[[str], None] | None = None, assume_yes: bool = False
+    ) -> None:
         self._log = log or (lambda _msg: None)
         self._assume_yes = assume_yes
         self._color = sys.stdout.isatty()

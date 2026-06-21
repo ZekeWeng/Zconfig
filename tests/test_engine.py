@@ -118,11 +118,15 @@ class AssessTests(unittest.TestCase):
 
 class HealthCommandTests(unittest.TestCase):
     def test_explicit_health_check_wins_over_post_install(self):
-        resolved = tool(post_install="rg --version", health_check="rg --count x README").resolve("macos")
+        resolved = tool(post_install="rg --version", health_check="rg --count x README").resolve(
+            "macos"
+        )
         self.assertEqual(resolved.health_command, "rg --count x README")
 
     def test_falls_back_to_post_install(self):
-        self.assertEqual(tool(post_install="rg --version").resolve("macos").health_command, "rg --version")
+        self.assertEqual(
+            tool(post_install="rg --version").resolve("macos").health_command, "rg --version"
+        )
 
     def test_none_when_neither_set(self):
         self.assertIsNone(tool().resolve("macos").health_command)
@@ -175,7 +179,9 @@ class TomlRoundTripTests(unittest.TestCase):
                     name="t",
                     options={"cask": True},
                     env={"E": "1"},
-                    overrides={"linux": {"manager": "script", "options": {"check": "x"}, "env": {"F": "2"}}},
+                    overrides={
+                        "linux": {"manager": "script", "options": {"check": "x"}, "env": {"F": "2"}}
+                    },
                 ),
             )
         )
@@ -190,7 +196,9 @@ class TomlRoundTripTests(unittest.TestCase):
         self.assertEqual(self._round_trip(m).get("rg").health_check, "rg --version")
 
     def test_settings_round_trip(self):
-        m = Manifest(tools=(tool(),), settings=Settings(default_tags=("core",), default_platform="linux"))
+        m = Manifest(
+            tools=(tool(),), settings=Settings(default_tags=("core",), default_platform="linux")
+        )
         out = self._round_trip(m)
         self.assertEqual(out.settings, Settings(default_tags=("core",), default_platform="linux"))
 
@@ -199,7 +207,11 @@ class LockRoundTripTests(unittest.TestCase):
     def test_options_persist_for_orphan_removal(self):
         path = Path(tempfile.mktemp(suffix=".lock"))
         store = JsonLockStore(path)
-        store.save(Lock(entries=(LockEntry("t", "script", "t", "1", "now", options={"uninstall": "rm x"}),)))
+        store.save(
+            Lock(
+                entries=(LockEntry("t", "script", "t", "1", "now", options={"uninstall": "rm x"}),)
+            )
+        )
         loaded = store.load().get("t")
         self.assertEqual(loaded.options, {"uninstall": "rm x"})
 
@@ -267,17 +279,24 @@ class _SilentConsole:
     def warn(self, m): ...
     def error(self, m): ...
     def table(self, headers, rows, *, highlight=None): ...
-    def confirm(self, prompt, *, default=False): return default
-    def choose(self, prompt, choices, default): return default
+    def confirm(self, prompt, *, default=False):
+        return default
+
+    def choose(self, prompt, choices, default):
+        return default
 
 
 class _NoManagers:
-    def get(self, name): return None
-    def all(self): return []
+    def get(self, name):
+        return None
+
+    def all(self):
+        return []
 
 
 class _FixedClock:
-    def now_iso(self): return "2026-01-01T00:00:00+00:00"
+    def now_iso(self):
+        return "2026-01-01T00:00:00+00:00"
 
 
 class ConfigCommandTests(unittest.TestCase):
@@ -378,7 +397,17 @@ class CliBoundaryTests(unittest.TestCase):
         path.write_text("[tools.broken\n")  # missing ]
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
-            code = main(["--manifest", str(path), "--lock", tempfile.mktemp(), "status"])
+            code = main(
+                [
+                    "--manifest",
+                    str(path),
+                    "--lock",
+                    tempfile.mktemp(),
+                    "--log-file",
+                    tempfile.mktemp(),  # isolate from the real ~/.zconfig log
+                    "status",
+                ]
+            )
         self.assertEqual(code, 1)
         self.assertIn("invalid TOML", err.getvalue())
         self.assertNotIn("Traceback", err.getvalue())
@@ -390,7 +419,8 @@ class CliBoundaryTests(unittest.TestCase):
         from engine.__main__ import _FileLog
 
         path = Path(tempfile.mktemp())
-        _FileLog(path, "test")
+        with _FileLog(path, "test"):
+            pass
         self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
 
 
@@ -442,22 +472,41 @@ class _StubManager(PackageManager):
         self._current = current
         self.installs: list[str] = []
 
-    def is_available(self): return True
-    def is_installed(self, tool): return True
-    def installed_version(self, tool): return self._current
-    def latest_version(self, tool): return self._current
+    def is_available(self):
+        return True
+
+    def is_installed(self, tool):
+        return True
+
+    def installed_version(self, tool):
+        return self._current
+
+    def latest_version(self, tool):
+        return self._current
+
     def install(self, tool):
         self.installs.append(tool.name)
         return CommandResult(0, "", "")
-    def update(self, tool): return CommandResult(0, "", "")
-    def uninstall(self, tool): return CommandResult(0, "", "")
-    def pin(self, tool): return CommandResult(0, "", "")
+
+    def update(self, tool):
+        return CommandResult(0, "", "")
+
+    def uninstall(self, tool):
+        return CommandResult(0, "", "")
+
+    def pin(self, tool):
+        return CommandResult(0, "", "")
 
 
 class _OneManager:
-    def __init__(self, manager): self._manager = manager
-    def get(self, name): return self._manager if name == self._manager.name else None
-    def all(self): return [self._manager]
+    def __init__(self, manager):
+        self._manager = manager
+
+    def get(self, name):
+        return self._manager if name == self._manager.name else None
+
+    def all(self):
+        return [self._manager]
 
 
 class PinThrashTests(unittest.TestCase):
@@ -482,13 +531,17 @@ class PinThrashTests(unittest.TestCase):
         )
 
     def test_unsatisfiable_pin_is_not_reinstalled(self):
-        mgr = _StubManager(FakeRunner(), name="brewish", installs_exact_version=False, current="15.0.0")
+        mgr = _StubManager(
+            FakeRunner(), name="brewish", installs_exact_version=False, current="15.0.0"
+        )
         outcome = self._engine(mgr).sync(assume_yes=True)
         self.assertTrue(outcome.ok)
         self.assertEqual(mgr.installs, [])  # no thrash
 
     def test_satisfiable_pin_drift_does_reinstall(self):
-        mgr = _StubManager(FakeRunner(), name="cargoish", installs_exact_version=True, current="15.0.0")
+        mgr = _StubManager(
+            FakeRunner(), name="cargoish", installs_exact_version=True, current="15.0.0"
+        )
         self._engine(mgr).sync(assume_yes=True)
         self.assertEqual(mgr.installs, ["rg"])  # drift gets fixed
 
@@ -515,20 +568,35 @@ class DoctorHealthCheckTests(unittest.TestCase):
 
         path = Path(tempfile.mktemp(suffix=".toml"))
         TomlManifestStore(path).save(
-            Manifest(tools=(tool(name="rg", manager="brewish", platforms=("macos",),
-                                 post_install="should-not-run", health_check="HEALTHCMD"),))
+            Manifest(
+                tools=(
+                    tool(
+                        name="rg",
+                        manager="brewish",
+                        platforms=("macos",),
+                        post_install="should-not-run",
+                        health_check="HEALTHCMD",
+                    ),
+                )
+            )
         )
         runner = _HealthRunner(fail_marker="HEALTHCMD")
-        mgr = _StubManager(FakeRunner(), name="brewish", installs_exact_version=False, current="14.1.0")
-        report = json.loads(_capture_stdout(lambda: Engine(
-            manifest_store=TomlManifestStore(path),
-            lock_store=JsonLockStore(Path(tempfile.mktemp())),
-            managers=_OneManager(mgr),
-            runner=runner,
-            console=_SilentConsole(),
-            clock=_FixedClock(),
-            platform="macos",
-        ).doctor(as_json=True)))
+        mgr = _StubManager(
+            FakeRunner(), name="brewish", installs_exact_version=False, current="14.1.0"
+        )
+        report = json.loads(
+            _capture_stdout(
+                lambda: Engine(
+                    manifest_store=TomlManifestStore(path),
+                    lock_store=JsonLockStore(Path(tempfile.mktemp())),
+                    managers=_OneManager(mgr),
+                    runner=runner,
+                    console=_SilentConsole(),
+                    clock=_FixedClock(),
+                    platform="macos",
+                ).doctor(as_json=True)
+            )
+        )
         self.assertFalse(report["ok"])
         self.assertEqual(report["health_failures"][0]["check"], "HEALTHCMD")
         self.assertNotIn("should-not-run", runner.ran)  # post_install was not used
@@ -538,10 +606,20 @@ class CommandRegistryTests(unittest.TestCase):
     # A valid argv for each command (positionals filled in) — every registered
     # command must parse and resolve, so a missing wire fails loudly here.
     _ARGV = {
-        "bootstrap": ["bootstrap"], "sync": ["sync"], "list": ["list"], "status": ["status"],
-        "update": ["update"], "add": ["add", "x"], "remove": ["remove", "x"], "pin": ["pin", "x"],
-        "unpin": ["unpin", "x"], "doctor": ["doctor"], "export": ["export"],
-        "config": ["config", "list"], "why": ["why", "x"], "completion": ["completion", "bash"],
+        "bootstrap": ["bootstrap"],
+        "sync": ["sync"],
+        "list": ["list"],
+        "status": ["status"],
+        "update": ["update"],
+        "add": ["add", "x"],
+        "remove": ["remove", "x"],
+        "pin": ["pin", "x"],
+        "unpin": ["unpin", "x"],
+        "doctor": ["doctor"],
+        "export": ["export"],
+        "config": ["config", "list"],
+        "why": ["why", "x"],
+        "completion": ["completion", "bash"],
     }
 
     def test_every_command_parses_and_resolves(self):
@@ -567,6 +645,58 @@ class DryRunnerTests(unittest.TestCase):
         self.assertEqual(inner.calls, [["brew", "list"]])  # only the probe reached the inner runner
         self.assertEqual(len(logged), 1)
         self.assertIn("would run", logged[0])
+
+
+class ApplyEnvTests(unittest.TestCase):
+    """The per-tool [env] overlay must set vars for the provisioning span and then
+    fully restore os.environ — including when the body raises, since it wraps the
+    manager install plus both hooks."""
+
+    def test_sets_then_removes_a_new_variable(self):
+        import os
+
+        from engine.services import _apply_env
+
+        key = "ZCONFIG_TEST_ENV_NEW"
+        os.environ.pop(key, None)
+        with _apply_env({key: "1"}):
+            self.assertEqual(os.environ[key], "1")
+        self.assertNotIn(key, os.environ)  # absent before -> removed after
+
+    def test_restores_a_preexisting_variable(self):
+        import os
+
+        from engine.services import _apply_env
+
+        key = "ZCONFIG_TEST_ENV_PRE"
+        os.environ[key] = "original"
+        try:
+            with _apply_env({key: "override"}):
+                self.assertEqual(os.environ[key], "override")
+            self.assertEqual(os.environ[key], "original")  # restored, not removed
+        finally:
+            os.environ.pop(key, None)
+
+    def test_restores_even_when_the_body_raises(self):
+        import os
+
+        from engine.services import _apply_env
+
+        key = "ZCONFIG_TEST_ENV_RAISE"
+        os.environ.pop(key, None)
+        with self.assertRaises(RuntimeError), _apply_env({key: "1"}):
+            raise RuntimeError("boom")
+        self.assertNotIn(key, os.environ)  # cleaned up despite the exception
+
+    def test_empty_env_is_a_noop(self):
+        import os
+
+        from engine.services import _apply_env
+
+        before = dict(os.environ)
+        with _apply_env({}):
+            pass
+        self.assertEqual(dict(os.environ), before)
 
 
 if __name__ == "__main__":

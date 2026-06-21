@@ -29,7 +29,9 @@ class AptManager(PackageManager):
         return self.runner.run(["dpkg", "-s", tool.package], read_only=True).ok
 
     def installed_version(self, tool: ResolvedTool) -> str | None:
-        result = self.runner.run(["dpkg-query", "-W", "-f=${Version}", tool.package], read_only=True)
+        result = self.runner.run(
+            ["dpkg-query", "-W", "-f=${Version}", tool.package], read_only=True
+        )
         return result.stdout.strip() or None if result.ok else None
 
     def latest_version(self, tool: ResolvedTool) -> str | None:
@@ -44,10 +46,14 @@ class AptManager(PackageManager):
 
     def install(self, tool: ResolvedTool) -> CommandResult:
         target = f"{tool.package}={tool.version}" if tool.is_pinned else tool.package
-        return self.runner.run(_sudo(["apt-get", "install", "-y", "--no-install-recommends", target]), capture=False)
+        return self.runner.run(
+            _sudo(["apt-get", "install", "-y", "--no-install-recommends", target]), capture=False
+        )
 
     def update(self, tool: ResolvedTool) -> CommandResult:
-        return self.runner.run(_sudo(["apt-get", "install", "--only-upgrade", "-y", tool.package]), capture=False)
+        return self.runner.run(
+            _sudo(["apt-get", "install", "--only-upgrade", "-y", tool.package]), capture=False
+        )
 
     def uninstall(self, tool: ResolvedTool) -> CommandResult:
         return self.runner.run(_sudo(["apt-get", "remove", "-y", tool.package]), capture=False)

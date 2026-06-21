@@ -55,5 +55,7 @@ class PipxManager(PackageManager):
 
     def pin(self, tool: ResolvedTool) -> CommandResult:
         if tool.is_pinned:
-            return self.runner.run(["pipx", "install", "--force", f"{tool.package}=={tool.version}"], capture=False)
+            return self.runner.run(
+                ["pipx", "install", "--force", f"{tool.package}=={tool.version}"], capture=False
+            )
         return CommandResult(0, "", "pipx has no hold; pin enforced by manifest version")

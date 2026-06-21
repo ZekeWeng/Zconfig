@@ -11,13 +11,16 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+from typing import TypeVar
 
 from ..ports import CommandRunner, ManagerProvider, PackageManager
 
 _REGISTRY: dict[str, type[PackageManager]] = {}
 
+_ManagerT = TypeVar("_ManagerT", bound=PackageManager)
 
-def register(cls: type[PackageManager]) -> type[PackageManager]:
+
+def register(cls: type[_ManagerT]) -> type[_ManagerT]:
     name = getattr(cls, "name", None)
     if not name:
         raise ValueError(f"{cls.__name__} must define a class-level `name`")

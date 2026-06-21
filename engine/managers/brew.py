@@ -131,6 +131,12 @@ class BrewManager(PackageManager):
         if casks.ok:
             for pkg in casks.stdout.split():
                 out.append(
-                    {"name": pkg, "manager": "brew", "package": pkg, "tags": ["exported"], "options": {"cask": True}}
+                    {
+                        "name": pkg,
+                        "manager": "brew",
+                        "package": pkg,
+                        "tags": ["exported"],
+                        "options": {"cask": True},
+                    }
                 )
         return out

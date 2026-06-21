@@ -9,7 +9,7 @@ here is deterministic given its inputs, which keeps the interesting decisions
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from enum import Enum
+from enum import StrEnum
 
 # Canonical platform identifiers used throughout the manifest and engine.
 MACOS = "macos"
@@ -20,7 +20,7 @@ KNOWN_PLATFORMS = (MACOS, LINUX, WSL)
 LATEST = "latest"
 
 
-class Status(str, Enum):
+class Status(StrEnum):
     """Where a tool stands relative to the manifest, for the current machine."""
 
     OK = "ok"  # installed, at the version we want
@@ -80,8 +80,8 @@ class Tool:
             pre_install=_opt_str(over.get("pre_install", self.pre_install)),
             post_install=_opt_str(over.get("post_install", self.post_install)),
             health_check=_opt_str(over.get("health_check", self.health_check)),
-            options={**self.options, **over.get("options", {})},
-            env={**self.env, **over.get("env", {})},
+            options={**self.options, **_opt_map(over.get("options"))},
+            env={**self.env, **_str_map(over.get("env"))},
         )
 
 
@@ -145,7 +145,9 @@ class Manifest:
         return Manifest(tools=kept + (tool,), settings=self.settings)
 
     def without_tool(self, name: str) -> Manifest:
-        return Manifest(tools=tuple(t for t in self.tools if t.name != name), settings=self.settings)
+        return Manifest(
+            tools=tuple(t for t in self.tools if t.name != name), settings=self.settings
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,31 +218,34 @@ def assess(tool: ResolvedTool, obs: Observation, *, pin_exact_supported: bool = 
     one installed can never converge, so we report it as PIN_UNSATISFIABLE rather
     than PIN_DRIFT, which would otherwise make sync reinstall on every run.
     """
-    base = dict(
-        name=tool.name,
-        manager=tool.manager,
-        package=tool.package,
-        desired_version=tool.version,
-        current=obs.current,
-        latest=obs.latest,
-        pinned=tool.is_pinned,
-    )
+
+    def at(status: Status) -> Assessment:
+        return Assessment(
+            name=tool.name,
+            manager=tool.manager,
+            package=tool.package,
+            desired_version=tool.version,
+            status=status,
+            current=obs.current,
+            latest=obs.latest,
+            pinned=tool.is_pinned,
+        )
+
     if not obs.manager_available:
-        return Assessment(status=Status.UNKNOWN, **base)
+        return at(Status.UNKNOWN)
     if not obs.installed:
-        return Assessment(status=Status.MISSING, **base)
+        return at(Status.MISSING)
     if tool.is_pinned:
         # Can't read the installed version → can't claim the pin is satisfied.
         if obs.current is None:
-            return Assessment(status=Status.UNKNOWN, **base)
+            return at(Status.UNKNOWN)
         # A pin is satisfied only when the installed version matches exactly.
         if not version_matches(obs.current, tool.version):
-            drift = Status.PIN_DRIFT if pin_exact_supported else Status.PIN_UNSATISFIABLE
-            return Assessment(status=drift, **base)
-        return Assessment(status=Status.PINNED, **base)
+            return at(Status.PIN_DRIFT if pin_exact_supported else Status.PIN_UNSATISFIABLE)
+        return at(Status.PINNED)
     if obs.latest is not None and obs.current is not None and obs.current != obs.latest:
-        return Assessment(status=Status.OUTDATED, **base)
-    return Assessment(status=Status.OK, **base)
+        return at(Status.OUTDATED)
+    return at(Status.OK)
 
 
 def find_orphans(manifest: Manifest, lock: Lock) -> tuple[LockEntry, ...]:
@@ -271,7 +276,9 @@ def validate_manifest(manifest: Manifest, known_managers: set[str]) -> list[str]
     for t in manifest.tools:
         for plat in t.platforms:
             if plat not in KNOWN_PLATFORMS:
-                problems.append(f"{t.name}: unknown platform '{plat}' (known: {', '.join(KNOWN_PLATFORMS)})")
+                problems.append(
+                    f"{t.name}: unknown platform '{plat}' (known: {', '.join(KNOWN_PLATFORMS)})"
+                )
         for plat in t.overrides:
             if plat not in KNOWN_PLATFORMS:
                 problems.append(f"{t.name}: override targets unknown platform '{plat}'")
@@ -285,7 +292,9 @@ def validate_manifest(manifest: Manifest, known_managers: set[str]) -> list[str]
             if resolved.manager not in known_managers:
                 problems.append(f"{t.name} ({plat}): unknown manager '{resolved.manager}'")
             if resolved.manager == "script" and not resolved.options.get("install"):
-                problems.append(f"{t.name} ({plat}): script manager needs an options.install command")
+                problems.append(
+                    f"{t.name} ({plat}): script manager needs an options.install command"
+                )
     return problems
 
 
@@ -300,6 +309,14 @@ def version_matches(installed: str, pinned: str) -> bool:
 
 def _opt_str(value: object) -> str | None:
     return None if value is None else str(value)
+
+
+def _opt_map(value: object) -> dict[str, object]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _str_map(value: object) -> dict[str, str]:
+    return {str(k): str(v) for k, v in value.items()} if isinstance(value, dict) else {}
 
 
 def replace_tool_version(tool: Tool, version: str) -> Tool:

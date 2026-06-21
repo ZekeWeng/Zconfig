@@ -125,10 +125,7 @@ def _render_tool(tool: Tool) -> str:
     lines.append(f"manager = {_v(tool.manager)}")
     lines.append(f"package = {_v(tool.package)}")
     lines.append(f"version = {_v(tool.version)}")
-    if tuple(tool.platforms) != tuple(KNOWN_PLATFORMS):
-        lines.append(f"platforms = {_v(list(tool.platforms))}")
-    else:
-        lines.append(f"platforms = {_v(list(KNOWN_PLATFORMS))}")
+    lines.append(f"platforms = {_v(list(tool.platforms))}")
     if tool.tags:
         lines.append(f"tags = {_v(list(tool.tags))}")
     if tool.pre_install:
@@ -148,10 +145,12 @@ def _render_tool(tool: Tool) -> str:
         nested = {k: v for k, v in over.items() if k not in ("options", "env")}
         if nested:
             block += f"\n\n[{head}.overrides.{_key(plat)}]\n" + _render_table(nested)
-        if over.get("options"):
-            block += f"\n\n[{head}.overrides.{_key(plat)}.options]\n" + _render_table(over["options"])
-        if over.get("env"):
-            block += f"\n\n[{head}.overrides.{_key(plat)}.env]\n" + _render_table(over["env"])
+        over_options = over.get("options")
+        if isinstance(over_options, dict) and over_options:
+            block += f"\n\n[{head}.overrides.{_key(plat)}.options]\n" + _render_table(over_options)
+        over_env = over.get("env")
+        if isinstance(over_env, dict) and over_env:
+            block += f"\n\n[{head}.overrides.{_key(plat)}.env]\n" + _render_table(over_env)
     return block + "\n"
 
 

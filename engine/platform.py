@@ -28,4 +28,4 @@ def detect_platform() -> str:
 
 class SystemClock(Clock):
     def now_iso(self) -> str:
-        return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+        return datetime.datetime.now(datetime.UTC).replace(microsecond=0).isoformat()

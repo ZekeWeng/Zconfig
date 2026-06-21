@@ -43,7 +43,9 @@ class GoManager(PackageManager):
         )
 
     def installed_version(self, tool: ResolvedTool) -> str | None:
-        binary = self.runner.which(self._binary_name(tool)) or os.path.join(self._gobin(), self._binary_name(tool))
+        binary = self.runner.which(self._binary_name(tool)) or os.path.join(
+            self._gobin(), self._binary_name(tool)
+        )
         result = self.runner.run(["go", "version", "-m", binary], read_only=True)
         if not result.ok:
             return None

@@ -43,7 +43,15 @@ class FullCycleIntegration(unittest.TestCase):
         sink = io.StringIO()
         with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(sink):
             return main(
-                ["--manifest", str(self.manifest), "--lock", str(self.lock), "--log-file", str(self.log), *args]
+                [
+                    "--manifest",
+                    str(self.manifest),
+                    "--lock",
+                    str(self.lock),
+                    "--log-file",
+                    str(self.log),
+                    *args,
+                ]
             )
 
     def _locked(self) -> dict:
@@ -67,8 +75,15 @@ class FullCycleIntegration(unittest.TestCase):
 
     def test_add_with_health_check_writes_the_field(self):
         code = self._run(
-            "add", "widget", "--manager", "manual", "--package", "widget",
-            "--health-check", "widget --version", "--yes",
+            "add",
+            "widget",
+            "--manager",
+            "manual",
+            "--package",
+            "widget",
+            "--health-check",
+            "widget --version",
+            "--yes",
         )
         self.assertEqual(code, 0)
         self.assertIn('health_check = "widget --version"', self.manifest.read_text())
@@ -83,7 +98,16 @@ class FullCycleIntegration(unittest.TestCase):
         sink = io.StringIO()
         with contextlib.redirect_stdout(sink), contextlib.redirect_stderr(io.StringIO()):
             code = main(
-                ["--manifest", str(self.manifest), "--lock", str(self.lock), "--log-file", str(self.log), "status", "--json"]
+                [
+                    "--manifest",
+                    str(self.manifest),
+                    "--lock",
+                    str(self.lock),
+                    "--log-file",
+                    str(self.log),
+                    "status",
+                    "--json",
+                ]
             )
         self.assertEqual(code, 0)
         rows = json.loads(sink.getvalue())
