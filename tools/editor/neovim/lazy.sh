@@ -18,6 +18,12 @@ install_lazy_nvim() {
         return 1
     fi
     log_info "Installing lazy.nvim (pinned to ${sha:0:7})..."
-    git clone --filter=blob:none https://github.com/folke/lazy.nvim.git "$LAZY_NVIM_DIR"
-    git -C "$LAZY_NVIM_DIR" checkout "$sha"
+    if ! git clone --filter=blob:none https://github.com/folke/lazy.nvim.git "$LAZY_NVIM_DIR"; then
+        log_err "Failed to clone lazy.nvim"
+        return 1
+    fi
+    if ! git -C "$LAZY_NVIM_DIR" checkout "$sha"; then
+        log_err "Failed to pin lazy.nvim to ${sha:0:7}"
+        return 1
+    fi
 }
