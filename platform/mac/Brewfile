@@ -21,6 +21,13 @@ cask "codex"            # OpenAI Codex CLI
 # downloads with SHA256 verification (brew casks were unreliable for
 # claude-code @ 2.1.112 and visual-studio-code @ 1.117.0).
 
+# Desktop apps
+cask "slack"
+cask "spotify"
+cask "arc"
+cask "ghostty"
+cask "cmux"
+
 # Development
 brew "node@22"       # LTS — bare `node` floats to current; pin for reproducibility
 brew "python@3.13"   # Pin a versioned formula — bare `python` is an alias and breaks `brew upgrade`
