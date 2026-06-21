@@ -300,12 +300,21 @@ def validate_manifest(manifest: Manifest, known_managers: set[str]) -> list[str]
 
 
 def version_matches(installed: str, pinned: str) -> bool:
-    """Does ``installed`` satisfy the ``pinned`` request? Tolerates a leading "v"
-    and prefix pins (pinning "1.2" matches "1.2.3"). Pure; shared by assess and
-    the pin-time satisfiability check."""
-    a = installed.lstrip("v")
-    b = pinned.lstrip("v")
-    return a == b or a.startswith(b + ".")
+    """Does ``installed`` satisfy the ``pinned`` request? Tolerates a leading "v",
+    a Debian ``epoch:`` prefix on the installed side (apt reports ``2:1.2.3``), and
+    prefix pins (pinning "1.2" matches "1.2.3"; "1.2.3" matches the Debian revision
+    "1.2.3-1ubuntu0"). Pure; shared by assess and the pin-time satisfiability check."""
+    a = _normalize_version(installed)
+    b = _normalize_version(pinned)
+    return a == b or a.startswith(b + ".") or a.startswith(b + "-")
+
+
+def _normalize_version(value: str) -> str:
+    """Strip a leading "v" and any Debian ``epoch:`` prefix so apt's full version
+    (``2:1.2.3-1ubuntu0``) compares against a plain manifest pin (``1.2.3``)."""
+    value = value.removeprefix("v")
+    epoch, sep, rest = value.partition(":")
+    return rest if sep and epoch.isdigit() else value
 
 
 def _opt_str(value: object) -> str | None:
