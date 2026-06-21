@@ -25,23 +25,30 @@ jobs:
           ignore_names: "*.zsh .zshrc .zshenv"
 
   python-engine:
-    name: zconfig engine (ruff + compile)
-    runs-on: ubuntu-latest
+    name: zconfig engine (${{ matrix.os }} / py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Install ruff
-        run: python3 -m pip install --user ruff
+          python-version: ${{ matrix.python-version }}
+      - name: Install pinned tooling
+        # Pin ruff/pyright to the pre-commit versions so the lint/format/type gate
+        # is reproducible — a floating release can change rules and pass one gate
+        # while failing another. No --user: setup-python's bin is already on PATH
+        # (and the --user dir differs on macOS), so the tools are called bare.
+        run: python3 -m pip install ruff==0.15.6 pyright==1.1.410
       - name: Lint
-        run: ~/.local/bin/ruff check engine tests
+        run: ruff check engine tests
       - name: Format check
-        run: ~/.local/bin/ruff format --check engine tests
-      - name: Install pyright
-        run: python3 -m pip install --user pyright
-      - name: Type-check (engine, standard mode)
-        run: ~/.local/bin/pyright
+        run: ruff format --check engine tests
+      - name: Type-check (engine, strict mode)
+        run: pyright
       - name: Compile (stdlib only — no third-party imports)
         run: python3 -m compileall -q engine
       - name: Unit tests
