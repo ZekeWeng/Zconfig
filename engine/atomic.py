@@ -14,6 +14,25 @@ import tempfile
 from pathlib import Path
 
 
+def _fsync_dir(directory: Path) -> None:
+    """Persist the rename itself, not just the file contents.
+
+    After ``os.replace`` the new data is durable but the directory entry (the
+    swap) may not survive a crash until the directory is fsynced. Best-effort:
+    opening or fsyncing a directory fails on some platforms (e.g. Windows), so
+    that case is ignored.
+    """
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        with contextlib.suppress(OSError):
+            os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def write_text_atomic(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
@@ -23,6 +42,7 @@ def write_text_atomic(path: Path, text: str) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(tmp, path)  # atomic on POSIX and Windows when same filesystem
+        _fsync_dir(path.parent)
     except BaseException:
         with contextlib.suppress(OSError):
             os.unlink(tmp)
