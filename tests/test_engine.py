@@ -509,6 +509,50 @@ class _OneManager:
         return [self._manager]
 
 
+class BrewCacheTests(unittest.TestCase):
+    """Regression: brew re-probes after a mutation, not trusting the per-run cache."""
+
+    def test_is_installed_reflects_an_install_within_the_same_run(self):
+        from engine.domain import ResolvedTool
+        from engine.managers.brew import BrewManager
+
+        class FlippingBrew(CommandRunner):
+            """`brew list` reports ripgrep missing until `brew install` has run."""
+
+            def __init__(self):
+                self.installed = False
+
+            def run(self, args, *, capture=True, read_only=False, env=None):
+                if args[:2] == ["brew", "list"]:
+                    return CommandResult(0, "ripgrep 14.1.0\n" if self.installed else "", "")
+                if args[:2] == ["brew", "install"]:
+                    self.installed = True
+                    return CommandResult(0, "", "")
+                return CommandResult(0, "", "")
+
+            def which(self, program):
+                return "/opt/homebrew/bin/brew"
+
+        rg = ResolvedTool(
+            name="rg",
+            manager="brew",
+            package="ripgrep",
+            version="latest",
+            tags=(),
+            pre_install=None,
+            post_install=None,
+            options={},
+        )
+        manager = BrewManager(FlippingBrew())
+
+        # arrange: assess probes is_installed first, snapshotting "missing"
+        self.assertFalse(manager.is_installed(rg))
+        # act: provision installs it (brew really lands it)
+        manager.install(rg)
+        # assert: the post-install verify must re-probe, not read the stale snapshot
+        self.assertTrue(manager.is_installed(rg))
+
+
 class PinThrashTests(unittest.TestCase):
     """sync must not reinstall a tool whose pin the manager can never satisfy."""
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 
 from ..domain import ResolvedTool
-from ..ports import CommandResult, PackageManager
+from ..ports import CommandResult, CommandRunner, PackageManager
 from . import register
 
 # Suppress brew's implicit `brew update` (a network round-trip) on every read.
@@ -27,7 +27,7 @@ class BrewManager(PackageManager):
     # (hold current), so pinning to a *different* version can never converge.
     installs_exact_version = False
 
-    def __init__(self, runner) -> None:
+    def __init__(self, runner: CommandRunner) -> None:
         super().__init__(runner)
         # All caches are populated once per run from batched calls — a full
         # manifest costs three brew invocations, not three per tool.
@@ -93,26 +93,43 @@ class BrewManager(PackageManager):
         # Not in the outdated set means it's current: latest == what's installed.
         return self.installed_version(tool)
 
+    def _invalidate(self) -> None:
+        """Drop the per-run probe caches after a mutation.
+
+        The maps snapshot brew's state once and reuse it all run. Without this,
+        sync's post-install ``is_installed`` check (services.py) reads the
+        pre-install snapshot and reports a just-installed tool as still missing.
+        """
+        self._formulae = None
+        self._casks = None
+        self._outdated = None
+
     def install(self, tool: ResolvedTool) -> CommandResult:
         cmd = ["brew", "install"]
         if self._is_cask(tool):
             cmd.append("--cask")
         cmd.append(tool.package)
-        return self.runner.run(cmd, capture=False)
+        result = self.runner.run(cmd, capture=False)
+        self._invalidate()
+        return result
 
     def update(self, tool: ResolvedTool) -> CommandResult:
         cmd = ["brew", "upgrade"]
         if self._is_cask(tool):
             cmd.append("--cask")
         cmd.append(tool.package)
-        return self.runner.run(cmd, capture=False)
+        result = self.runner.run(cmd, capture=False)
+        self._invalidate()
+        return result
 
     def uninstall(self, tool: ResolvedTool) -> CommandResult:
         cmd = ["brew", "uninstall"]
         if self._is_cask(tool):
             cmd.append("--cask")
         cmd.append(tool.package)
-        return self.runner.run(cmd, capture=False)
+        result = self.runner.run(cmd, capture=False)
+        self._invalidate()
+        return result
 
     def pin(self, tool: ResolvedTool) -> CommandResult:
         if self._is_cask(tool):
