@@ -42,7 +42,7 @@ macOS prereq: `xcode-select --install` (git). Run `make` (no args) for the menu.
 | `make sync` | Converge installed software to `software.toml` |
 | `make doctor` | Check the `zconfig` environment health |
 
-Develop with `make check` (syntax) and `make lint` (shellcheck).
+Develop with `make check` (syntax), `make lint` (shellcheck + ruff), and `make test` (engine unit tests).
 
 ## Customize
 
@@ -90,7 +90,7 @@ zconfig completion zsh > "${fpath[1]}/_zconfig"
 
 `doctor` also statically validates the manifest (unknown managers/platforms, a `script` tool with no install command) and reports those before probing anything live.
 
-Global flags: `--dry-run` (show actions, change nothing), `--yes` (assume yes), `--tags core,dev` (operate on a subset), `--manifest` / `--lock` / `--log-file` (override paths), `--version`. Every run appends to `$ZCONFIG_DIR/.zconfig.log`.
+Per-command flags: `--dry-run` (show actions, change nothing), `--yes` (assume yes), `--tags core,dev` (operate on a subset). Top-level flags: `--manifest` / `--lock` / `--log-file` (override paths), `--version`. Every run appends to `$ZCONFIG_DIR/.zconfig.log`.
 
 ### Configuring defaults
 
@@ -209,7 +209,7 @@ Tools are grouped by what they do for the user, not by tech stack:
 | Category | Tools |
 |---|---|
 | `shell/`    | `zsh`, `starship` |
-| `terminal/` | `tmux`, `ssh` |
+| `terminal/` | `ghostty`, `tmux`, `ssh` |
 | `editor/`   | `neovim`, `vscode` |
 | `workflow/` | `git`, `precommit` |
 | `ai/`       | `claude-code`, `codex` |
