@@ -9,6 +9,7 @@ ensure_env_file() {
     local zconfig_dir="$1"
     if [[ ! -f "$zconfig_dir/.env" ]]; then
         cp "$zconfig_dir/.env.example" "$zconfig_dir/.env"
+        chmod 600 "$zconfig_dir/.env"  # may hold API tokens — keep it owner-only
         log_info "Created .env from .env.example — edit $zconfig_dir/.env with your values"
         prompt_identity "$zconfig_dir/.env"
     fi
