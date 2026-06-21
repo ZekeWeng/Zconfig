@@ -14,6 +14,13 @@ from ..ports import CommandResult, PackageManager
 from . import register
 
 
+def _semver_key(version: str) -> tuple[int, ...]:
+    """Order key for a Go version (``v1.2.3``, ``v2.0.0+incompatible``); non-numeric
+    pieces sort low so a malformed tag never outranks a real release."""
+    core = version.removeprefix("v").split("+", 1)[0].split("-", 1)[0]
+    return tuple(int(p) if p.isdigit() else 0 for p in core.split("."))
+
+
 @register
 class GoManager(PackageManager):
     name = "go"
@@ -60,8 +67,10 @@ class GoManager(PackageManager):
         result = self.runner.run(["go", "list", "-m", "-versions", module], read_only=True)
         if not result.ok or not result.stdout.strip():
             return None
-        versions = result.stdout.split()[1:]
-        return versions[-1].lstrip("v") if versions else None
+        versions = result.stdout.split()[1:]  # first field is the module path
+        stable = [v for v in versions if "-" not in v]  # drop prereleases (v1.2.3-rc1)
+        best = max(stable or versions, key=_semver_key, default="")
+        return best.removeprefix("v") or None
 
     def _target(self, tool: ResolvedTool) -> str:
         base = tool.package.split("@", 1)[0]
