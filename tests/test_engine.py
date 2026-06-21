@@ -553,6 +553,82 @@ class BrewCacheTests(unittest.TestCase):
         self.assertTrue(manager.is_installed(rg))
 
 
+class VersionMatchTests(unittest.TestCase):
+    """version_matches tolerates v-prefixes, apt epochs, and Debian revisions."""
+
+    def test_plain_and_prefix_pins(self):
+        from engine.domain import version_matches
+
+        self.assertTrue(version_matches("1.2.3", "1.2.3"))
+        self.assertTrue(version_matches("v1.2.3", "1.2.3"))
+        self.assertTrue(version_matches("1.2.3", "1.2"))  # prefix pin
+        self.assertFalse(version_matches("1.20.0", "1.2"))  # not a prefix
+
+    def test_apt_epoch_and_revision(self):
+        from engine.domain import version_matches
+
+        # apt reports the full Debian version; a manifest pin is plain.
+        self.assertTrue(version_matches("2:1.2.3-1ubuntu0", "1.2.3"))
+        self.assertTrue(version_matches("1.2.3-1ubuntu0", "1.2.3"))
+        self.assertTrue(version_matches("2:1.2.3-1ubuntu0", "1.2"))
+        self.assertFalse(version_matches("2:2.0.0", "1.2.3"))
+
+
+class GoVersionTests(unittest.TestCase):
+    """go latest_version returns the highest stable release, not the list's last
+    element, and skips prereleases."""
+
+    def test_latest_is_highest_stable_not_positional(self):
+        from engine.domain import ResolvedTool
+        from engine.managers.go import GoManager
+
+        class FakeGo(CommandRunner):
+            def run(self, args, *, capture=True, read_only=False, env=None):
+                if args[:3] == ["go", "list", "-m"]:
+                    # not ascending; the highest tag is a prerelease to be skipped
+                    return CommandResult(0, "example.com/m v1.9.0 v1.10.0 v2.0.0-rc1\n", "")
+                return CommandResult(0, "", "")
+
+            def which(self, program):
+                return "/usr/bin/go"
+
+        tool = ResolvedTool(
+            name="m",
+            manager="go",
+            package="example.com/m",
+            version="latest",
+            tags=(),
+            pre_install=None,
+            post_install=None,
+            options={},
+        )
+        self.assertEqual(GoManager(FakeGo()).latest_version(tool), "1.10.0")
+
+
+class BrewfileManifestSyncTests(unittest.TestCase):
+    """platform/mac/Brewfile and software.toml are two install paths for the same
+    brew software (brew bundle vs the engine's brew adapter); guard against drift."""
+
+    def test_brewfile_matches_macos_brew_tools_in_manifest(self):
+        import re
+
+        from engine.toml_io import TomlManifestStore
+
+        root = Path(__file__).resolve().parent.parent
+        manifest = TomlManifestStore(root / "software.toml").load()
+
+        formulae: set[str] = set()
+        casks: set[str] = set()
+        for resolved in manifest.for_platform("macos"):
+            if resolved.manager != "brew":
+                continue
+            (casks if resolved.options.get("cask") else formulae).add(resolved.package)
+
+        text = (root / "platform" / "mac" / "Brewfile").read_text()
+        self.assertEqual(formulae, set(re.findall(r'^brew "([^"]+)"', text, re.MULTILINE)))
+        self.assertEqual(casks, set(re.findall(r'^cask "([^"]+)"', text, re.MULTILINE)))
+
+
 class PinThrashTests(unittest.TestCase):
     """sync must not reinstall a tool whose pin the manager can never satisfy."""
 
