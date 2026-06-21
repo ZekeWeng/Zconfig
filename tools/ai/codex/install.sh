@@ -1,10 +1,11 @@
 #!/bin/bash
 # OpenAI Codex CLI — pinned native binary (Linux only). macOS uses brew cask.
+# Upstream ships statically-linked musl builds (the gnu target was dropped).
 # Bump CODEX_VERSION + hashes when upgrading.
 
 source "${ZCONFIG_DIR:-$HOME/.zconfig}/lib/bootstrap.sh"
 
-CODEX_VERSION="rust-v0.124.0"
+CODEX_VERSION="rust-v0.141.0"
 
 install_codex() {
     if command -v codex &> /dev/null; then
@@ -14,12 +15,12 @@ install_codex() {
     local binary sha
     case "$ARCH" in
         x86_64)
-            binary="codex-x86_64-unknown-linux-gnu"
-            sha="0d619d52d24e36c5ed159323d921d8a6709d9ebce375045d043d7a5909fc6b09"
+            binary="codex-x86_64-unknown-linux-musl"
+            sha="f1e2bf9fa0ba6eb82119d621b6b71bc38edd33c06dc2867b31a027052358957d"
             ;;
         aarch64)
-            binary="codex-aarch64-unknown-linux-gnu"
-            sha="9765486daac5af97b26864b5d3501d32aa6306b5f9f81b2bd6160b6ca46cb579"
+            binary="codex-aarch64-unknown-linux-musl"
+            sha="8c9f31811d659fcc17c5f1a21bc0971984469c9e3a63c2b39b61cc7694f3a101"
             ;;
         *)
             log_info "Skipping Codex — unsupported arch: $(uname -m)"

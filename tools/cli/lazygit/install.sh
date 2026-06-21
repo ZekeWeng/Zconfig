@@ -4,7 +4,7 @@
 
 source "${ZCONFIG_DIR:-$HOME/.zconfig}/lib/bootstrap.sh"
 
-LAZYGIT_VERSION="v0.61.1"
+LAZYGIT_VERSION="v0.62.2"
 
 install_lazygit() {
     if command -v lazygit &> /dev/null; then
@@ -14,12 +14,12 @@ install_lazygit() {
     local platform sha
     case "$ARCH" in
         x86_64)
-            platform="Linux_x86_64"
-            sha="1b91e660700f2332696726b635202576b543e2bc49b639830dccd26bc5160d5d"
+            platform="linux_x86_64"
+            sha="8b9a4c2d0969cbea92b45c956dd2a44e1ba76900c9df49f1c60984045ce77984"
             ;;
         aarch64)
-            platform="Linux_arm64"
-            sha="20b1abb2bee5dfd46173b9047353eb678bc51a23839e821958d0b1863ab1655e"
+            platform="linux_arm64"
+            sha="9ab63dd75a7e9711c4c68a37d77f4334b8099a5d6a3f8fbe8f4e2768b159c9e9"
             ;;
         *)
             log_info "Skipping lazygit — unsupported arch: $(uname -m)"

@@ -196,23 +196,61 @@ manager = "script"
 check = "command -v codex"
 install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer codex"
 
+# ── Desktop apps (macOS) ─────────────────────────────────────────────
 [tools.claude-desktop]
 manager = "brew"
 package = "claude"
 platforms = ["macos"]
-tags = ["ai"]
+tags = ["app"]
 [tools.claude-desktop.options]
+cask = true
+
+[tools.slack]
+manager = "brew"
+package = "slack"
+platforms = ["macos"]
+tags = ["app"]
+[tools.slack.options]
+cask = true
+
+[tools.spotify]
+manager = "brew"
+package = "spotify"
+platforms = ["macos"]
+tags = ["app"]
+[tools.spotify.options]
+cask = true
+
+[tools.arc]
+manager = "brew"
+package = "arc"
+platforms = ["macos"]
+tags = ["app"]
+[tools.arc.options]
+cask = true
+
+[tools.ghostty]
+manager = "brew"
+package = "ghostty"
+platforms = ["macos"]
+tags = ["app"]
+[tools.ghostty.options]
+cask = true
+
+[tools.cmux]
+manager = "brew"
+package = "cmux"
+platforms = ["macos"]
+tags = ["app"]
+[tools.cmux.options]
 cask = true
 
 # ── Languages & toolchains ───────────────────────────────────────────
 [tools.node]
 manager = "brew"
 package = "node@22"
-platforms = ["macos", "linux"]
+platforms = ["macos"]
 tags = ["lang", "dev"]
-[tools.node.overrides.linux]
-manager = "apt"
-package = "nodejs"
 
 [tools.python]
 manager = "brew"
@@ -238,14 +276,11 @@ install = "source \"$ZCONFIG_DIR/lib/bootstrap.sh\" && run_installer uv"
 [tools.go]
 manager = "brew"
 package = "go"
-platforms = ["macos", "linux"]
+platforms = ["macos"]
 tags = ["lang", "dev"]
-[tools.go.overrides.linux]
-manager = "apt"
-package = "golang-go"
 
-# Rust and Elixir ship via brew on macOS only; the Linux installer does not
-# provision them, so they are scoped to macos to avoid false drift on Linux.
+# node, go, rust, and elixir ship via brew on macOS only; the Linux installer
+# does not provision them, so they are scoped to macos to avoid false drift.
 [tools.rust]
 manager = "brew"
 package = "rust"

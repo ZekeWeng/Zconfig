@@ -34,15 +34,3 @@ verify_and_download() {
         return 1
     fi
 }
-
-# verify_and_run <url> <tmp_path> <expected_hash> [args...]
-# Downloads, verifies, executes via bash with optional extra args, then cleans up.
-verify_and_run() {
-    local url="$1" path="$2" expected="$3"
-    shift 3
-    verify_and_download "$url" "$path" "$expected" || return 1
-    bash "$path" "$@"
-    local rc=$?
-    rm -f "$path"
-    return $rc
-}

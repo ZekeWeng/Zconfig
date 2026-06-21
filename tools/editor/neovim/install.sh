@@ -4,19 +4,21 @@
 
 source "${ZCONFIG_DIR:-$HOME/.zconfig}/lib/bootstrap.sh"
 
-NVIM_VERSION="v0.12.2"
-NVIM_MIN_VERSION="0.9.0"
+NVIM_VERSION="v0.12.3"
+# Config targets the nvim-treesitter `main` branch, which needs 0.12+; a distro
+# nvim older than this must be replaced by the pinned AppImage, not kept.
+NVIM_MIN_VERSION="0.12.0"
 
 install_neovim() {
     local asset sha
     case "$ARCH" in
         x86_64)
             asset="nvim-linux-x86_64.appimage"
-            sha="f9f1901144dc1b0715a1f5178b596d7cdbb22c0f027383bb430862d59377b59f"
+            sha="5709e7f3653c9ccc96bb78e79ae1ad3b1191f34d12075f27c469f702f301a2e8"
             ;;
         aarch64)
             asset="nvim-linux-arm64.appimage"
-            sha="ea5bbff4a53176e7677feb59e4246111cadd9eff1ff49613da71ed725a936dcd"
+            sha="d39dea9d81767676cbc0804788a78426210d5042efc250ea0ffae4b9fd6b58ee"
             ;;
         *)
             log_info "Skipping Neovim — unsupported arch: $(uname -m)"

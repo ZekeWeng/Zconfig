@@ -1,6 +1,6 @@
--- Bootstrap lazy.nvim — pinned to stable @ 2026-04-22
+-- Bootstrap lazy.nvim — commit kept in sync with lazy-lock.json
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-local lazy_sha = "332b4cbc8bf61589b6ff58ce42fca80173154669"
+local lazy_sha = "306a05526ada86a7b30af95c5cc81ffba93fef97"
 if not vim.loop.fs_stat(lazypath) then
   vim.fn.system({
     "git", "clone", "--filter=blob:none",

@@ -71,3 +71,19 @@ cci() {
     tar czf - -C ~/.zconfig .claude | tar xzf -
     echo "Claude config initialized in $(pwd)"
 }
+
+# Python versions via uv — download and switch CPython builds with no fuss.
+#   py            list installed versions
+#   py 3.12       download (if missing) and pin 3.12 for this directory
+# Pinning writes .python-version; `uv run`/`uv venv` then use that version.
+py() {
+    if ! command -v uv &> /dev/null; then
+        echo "uv not found — install it first (it manages Python downloads)" >&2
+        return 1
+    fi
+    if [[ -z "$1" ]]; then
+        uv python list --only-installed
+    else
+        uv python install "$1" && uv python pin "$1"
+    fi
+}

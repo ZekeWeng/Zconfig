@@ -5,7 +5,7 @@
 
 source "${ZCONFIG_DIR:-$HOME/.zconfig}/lib/bootstrap.sh"
 
-UV_VERSION="0.11.8"
+UV_VERSION="0.11.23"
 
 install_uv() {
     if command -v uv &> /dev/null; then
@@ -16,11 +16,11 @@ install_uv() {
     case "$ARCH" in
         x86_64)
             triple="x86_64-unknown-linux-gnu"
-            sha="56dd1b66701ecb62fe896abb919444e4b83c5e8645cca953e6ddd496ff8a0feb"
+            sha="e12c4cda2fe8c305510a78380a88f2c32a27e90cdcd123cefd2873388f0ebb5f"
             ;;
         aarch64)
             triple="aarch64-unknown-linux-gnu"
-            sha="eee8dd658d20e5ac85fec9c2326b6cbc9d83a1eef09ef07433e58698ac849591"
+            sha="1873a77350f6621279ae1a0d2227f2bd8b67131598f14a7eb0ba2215d3da2c98"
             ;;
         *)
             log_info "Skipping uv — unsupported arch: $(uname -m)"
