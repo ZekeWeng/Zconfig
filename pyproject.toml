@@ -17,9 +17,8 @@ select = ["E4", "E7", "E9", "F", "I", "UP"]
 [tool.pyright]
 # Scope: the engine only. The tests use terse fixtures (e.g. Tool(platforms="x"))
 # and dereference Optional returns the test data guarantees non-None, which trips
-# ~50 standard-mode diagnostics that are noise rather than bugs — so they are left
-# out of the gate. "standard" (not "strict") keeps the engine honest without the
-# broad annotation churn strict would demand on this stdlib-only codebase.
+# diagnostics that are noise rather than bugs — so they are left out of the gate.
+# "strict" holds the engine to a fully-annotated, zero-diagnostic baseline.
 pythonVersion = "3.11"
-typeCheckingMode = "standard"
+typeCheckingMode = "strict"
 include = ["engine"]

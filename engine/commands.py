@@ -19,7 +19,7 @@ from .domain import KNOWN_PLATFORMS, LATEST, Tool
 from .managers import Registry
 
 if TYPE_CHECKING:
-    from .services import Engine
+    from .services import Engine, Outcome
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,9 @@ class Command:
     tool_arg: bool = False  # first positional is a tool name (drives completion)
 
 
-def _add_common(parser: argparse.ArgumentParser, *, tags=True, yes=True, dry=True) -> None:
+def _add_common(
+    parser: argparse.ArgumentParser, *, tags: bool = True, yes: bool = True, dry: bool = True
+) -> None:
     if tags:
         parser.add_argument("--tags", help="comma-separated tags to filter (e.g. core,dev)")
     if yes:
@@ -50,28 +52,28 @@ def _tags(value: str | None) -> set[str] | None:
     return {t.strip() for t in value.split(",") if t.strip()} if value else None
 
 
-def _ok(outcome) -> int:
+def _ok(outcome: Outcome) -> int:
     return 0 if outcome.ok else 1
 
 
 # ── per-command parser configuration ──────────────────────────────────
 
 
-def _cfg_listing(p):
+def _cfg_listing(p: argparse.ArgumentParser) -> None:
     # Shared by `list` and `status`: tag filter + JSON, no mutation flags.
     _add_common(p, yes=False, dry=False)
     p.add_argument("--json", action="store_true", help="emit JSON on stdout instead of a table")
 
 
-def _cfg_update(p):
+def _cfg_update(p: argparse.ArgumentParser) -> None:
     _add_common(p, yes=False)
 
 
-def _cfg_doctor(p):
+def _cfg_doctor(p: argparse.ArgumentParser) -> None:
     p.add_argument("--json", action="store_true", help="emit JSON on stdout")
 
 
-def _cfg_add(p):
+def _cfg_add(p: argparse.ArgumentParser) -> None:
     _add_common(p, tags=False)
     p.add_argument("name")
     p.add_argument("--manager")
@@ -84,45 +86,45 @@ def _cfg_add(p):
     p.add_argument("--install", action="store_true", help="install immediately after adding")
 
 
-def _cfg_pin(p):
+def _cfg_pin(p: argparse.ArgumentParser) -> None:
     _add_common(p, tags=False, yes=False, dry=False)
     p.add_argument("name")
     p.add_argument("version", nargs="?", help="version to pin (default: currently installed)")
 
 
-def _cfg_config(p):
+def _cfg_config(p: argparse.ArgumentParser) -> None:
     p.add_argument("action", choices=["list", "get", "set", "unset"])
     p.add_argument("key", nargs="?", help="default_tags | default_platform")
     p.add_argument("value", nargs="?", help="value for `set`")
 
 
-def _cfg_why(p):
+def _cfg_why(p: argparse.ArgumentParser) -> None:
     p.add_argument("name")
     p.add_argument("--json", action="store_true", help="emit JSON on stdout")
 
 
-def _cfg_remove(p):
+def _cfg_remove(p: argparse.ArgumentParser) -> None:
     _add_common(p, tags=False)
     p.add_argument("name")
 
 
-def _cfg_unpin(p):
+def _cfg_unpin(p: argparse.ArgumentParser) -> None:
     _add_common(p, tags=False, yes=False, dry=False)
     p.add_argument("name")
 
 
-def _cfg_export(p):
+def _cfg_export(p: argparse.ArgumentParser) -> None:
     p.add_argument("--write", action="store_true", help="merge discoveries into the manifest")
 
 
-def _cfg_completion(p):
+def _cfg_completion(p: argparse.ArgumentParser) -> None:
     p.add_argument("shell", choices=["bash", "zsh"])
 
 
 # ── handlers ──────────────────────────────────────────────────────────
 
 
-def _run_add(engine, args):
+def _run_add(engine: Engine, args: argparse.Namespace) -> int:
     console = engine.console
     known = Registry.known_names()
     manager, package = args.manager, args.package
@@ -157,7 +159,7 @@ def _run_add(engine, args):
     return _ok(engine.add(tool, install_now=args.install))
 
 
-def _run_completion(_engine, args):
+def _run_completion(_engine: Engine, args: argparse.Namespace) -> int:
     from .completion import completion_script
 
     print(completion_script(args.shell), end="")

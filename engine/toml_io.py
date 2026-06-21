@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import re
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any, cast
 
 from .atomic import write_text_atomic
 from .domain import KNOWN_PLATFORMS, LATEST, Manifest, Settings, Tool
@@ -78,7 +80,7 @@ class TomlManifestStore(ManifestStore):
         write_text_atomic(self.path, "\n".join(chunks).rstrip() + "\n")
 
 
-def _parse_settings(body: dict) -> Settings:
+def _parse_settings(body: dict[str, Any]) -> Settings:
     platform = body.get("default_platform")
     return Settings(
         default_tags=tuple(body.get("default_tags", ())),
@@ -87,7 +89,7 @@ def _parse_settings(body: dict) -> Settings:
 
 
 def _render_settings(settings: Settings) -> str | None:
-    lines = []
+    lines: list[str] = []
     if settings.default_tags:
         lines.append(f"default_tags = {_v(list(settings.default_tags))}")
     if settings.default_platform:
@@ -95,8 +97,8 @@ def _render_settings(settings: Settings) -> str | None:
     return "[settings]\n" + "\n".join(lines) + "\n" if lines else None
 
 
-def _parse_tool(name: str, body: dict) -> Tool:
-    overrides_raw = body.get("overrides", {})
+def _parse_tool(name: str, body: dict[str, Any]) -> Tool:
+    overrides_raw: dict[str, dict[str, object]] = body.get("overrides", {})
     overrides = {plat: dict(over) for plat, over in overrides_raw.items()}
     return Tool(
         name=name,
@@ -147,14 +149,16 @@ def _render_tool(tool: Tool) -> str:
             block += f"\n\n[{head}.overrides.{_key(plat)}]\n" + _render_table(nested)
         over_options = over.get("options")
         if isinstance(over_options, dict) and over_options:
-            block += f"\n\n[{head}.overrides.{_key(plat)}.options]\n" + _render_table(over_options)
+            options_table = cast("dict[str, object]", over_options)
+            block += f"\n\n[{head}.overrides.{_key(plat)}.options]\n" + _render_table(options_table)
         over_env = over.get("env")
         if isinstance(over_env, dict) and over_env:
-            block += f"\n\n[{head}.overrides.{_key(plat)}.env]\n" + _render_table(over_env)
+            env_table = cast("dict[str, object]", over_env)
+            block += f"\n\n[{head}.overrides.{_key(plat)}.env]\n" + _render_table(env_table)
     return block + "\n"
 
 
-def _render_table(table: dict) -> str:
+def _render_table(table: Mapping[str, object]) -> str:
     return "\n".join(f"{_key(key)} = {_v(value)}" for key, value in table.items())
 
 
@@ -173,7 +177,7 @@ _ESCAPES = {
 
 
 def _escape(text: str) -> str:
-    out = []
+    out: list[str] = []
     for ch in text:
         if ch in _ESCAPES:
             out.append(_ESCAPES[ch])
@@ -193,9 +197,10 @@ def _v(value: object) -> str:
     if isinstance(value, str):
         return f'"{_escape(value)}"'
     if isinstance(value, (list, tuple)):
-        return "[" + ", ".join(_v(item) for item in value) + "]"
+        items = cast("list[object] | tuple[object, ...]", value)
+        return "[" + ", ".join(_v(item) for item in items) + "]"
     raise TypeError(f"unserializable manifest value: {value!r}")
 
 
-def _opt(value) -> str | None:
+def _opt(value: object) -> str | None:
     return None if value is None else str(value)

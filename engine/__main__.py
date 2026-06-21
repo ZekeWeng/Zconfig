@@ -13,6 +13,7 @@ import os
 import sys
 import tomllib
 from pathlib import Path
+from typing import cast
 
 from . import __version__
 from .commands import COMMANDS, COMMANDS_BY_NAME
@@ -112,7 +113,7 @@ def _require_manifest(engine: Engine, console: Console) -> bool:
     if not engine.manifest_store.exists():
         # .path is a TomlManifestStore detail; the port stays filesystem-agnostic
         # and the composition root only ever wires that one concrete store.
-        store_path = engine.manifest_store.path  # pyright: ignore[reportAttributeAccessIssue]
+        store_path = cast(TomlManifestStore, engine.manifest_store).path
         console.error(f"No manifest found at {store_path}. Create software.toml first.")
         return False
     return True
@@ -152,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     except tomllib.TOMLDecodeError as exc:
         # A typo in software.toml is common — give a clear error, not a traceback.
         # .path is a TomlManifestStore detail (see _require_manifest).
-        store_path = engine.manifest_store.path  # pyright: ignore[reportAttributeAccessIssue]
+        store_path = cast(TomlManifestStore, engine.manifest_store).path
         console.error(f"{store_path}: invalid TOML — {exc}")
         return 1
     except OSError as exc:

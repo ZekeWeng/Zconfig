@@ -26,7 +26,7 @@ class TerminalConsole(Console):
     def __init__(
         self, *, log: Callable[[str], None] | None = None, assume_yes: bool = False
     ) -> None:
-        self._log = log or (lambda _msg: None)
+        self._log: Callable[[str], None] = log or (lambda _msg: None)
         self._assume_yes = assume_yes
         self._color = sys.stdout.isatty()
 
@@ -69,7 +69,7 @@ class TerminalConsole(Console):
         print(self._paint(_YELLOW, header_line))
         print(self._paint(_DIM, "  ".join("-" * widths[i] for i in range(len(headers)))))
         for row in rows:
-            cells = []
+            cells: list[str] = []
             for i, cell in enumerate(row):
                 padded = cell.ljust(widths[i])
                 color = _NAMED.get(highlight.get(cell, ""))

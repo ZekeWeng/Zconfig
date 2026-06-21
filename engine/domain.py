@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from typing import cast
 
 # Canonical platform identifiers used throughout the manifest and engine.
 MACOS = "macos"
@@ -51,9 +52,9 @@ class Tool:
     pre_install: str | None = None
     post_install: str | None = None
     health_check: str | None = None
-    options: dict[str, object] = field(default_factory=dict)
-    env: dict[str, str] = field(default_factory=dict)
-    overrides: dict[str, dict[str, object]] = field(default_factory=dict)
+    options: dict[str, object] = field(default_factory=dict[str, object])
+    env: dict[str, str] = field(default_factory=dict[str, str])
+    overrides: dict[str, dict[str, object]] = field(default_factory=dict[str, dict[str, object]])
 
     @property
     def is_pinned(self) -> bool:
@@ -98,7 +99,7 @@ class ResolvedTool:
     post_install: str | None
     options: dict[str, object]
     health_check: str | None = None
-    env: dict[str, str] = field(default_factory=dict)
+    env: dict[str, str] = field(default_factory=dict[str, str])
 
     @property
     def is_pinned(self) -> bool:
@@ -165,7 +166,7 @@ class LockEntry:
     version: str
     installed_at: str
     pinned: bool = False
-    options: dict[str, object] = field(default_factory=dict)
+    options: dict[str, object] = field(default_factory=dict[str, object])
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,11 +313,15 @@ def _opt_str(value: object) -> str | None:
 
 
 def _opt_map(value: object) -> dict[str, object]:
-    return dict(value) if isinstance(value, dict) else {}
+    return dict(cast("dict[str, object]", value)) if isinstance(value, dict) else {}
 
 
 def _str_map(value: object) -> dict[str, str]:
-    return {str(k): str(v) for k, v in value.items()} if isinstance(value, dict) else {}
+    return (
+        {str(k): str(v) for k, v in cast("dict[object, object]", value).items()}
+        if isinstance(value, dict)
+        else {}
+    )
 
 
 def replace_tool_version(tool: Tool, version: str) -> Tool:

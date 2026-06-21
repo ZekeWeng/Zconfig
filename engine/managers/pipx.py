@@ -8,6 +8,7 @@ erroring. A pin installs ``package==version``.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from ..domain import ResolvedTool
 from ..ports import CommandResult, PackageManager
@@ -22,12 +23,12 @@ class PipxManager(PackageManager):
     def is_available(self) -> bool:
         return self.runner.which("pipx") is not None
 
-    def _metadata(self, package: str) -> dict | None:
+    def _metadata(self, package: str) -> dict[str, Any] | None:
         result = self.runner.run(["pipx", "list", "--json"], read_only=True)
         if not result.ok:
             return None
         try:
-            data = json.loads(result.stdout or "{}")
+            data: dict[str, Any] = json.loads(result.stdout or "{}")
         except json.JSONDecodeError:
             return None
         venv = data.get("venvs", {}).get(package)

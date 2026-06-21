@@ -13,6 +13,7 @@ import json
 import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
+from typing import cast
 
 from .domain import (
     KNOWN_PLATFORMS,
@@ -91,7 +92,7 @@ class Engine:
         return tools
 
     def _assess(self, tools: tuple[ResolvedTool, ...]) -> list[Assessment]:
-        results = []
+        results: list[Assessment] = []
         for tool in tools:
             manager = self.managers.get(tool.manager)
             if manager is None:
@@ -601,8 +602,8 @@ class Engine:
             self._render_why(report)
         return Outcome()
 
-    def _build_why(self, tool: Tool, name: str) -> dict:
-        report: dict = {
+    def _build_why(self, tool: Tool, name: str) -> dict[str, object]:
+        report: dict[str, object] = {
             "name": name,
             "platform": self.platform,
             "declared_platforms": list(tool.platforms),
@@ -651,16 +652,18 @@ class Engine:
         )
         return report
 
-    def _render_why(self, report: dict) -> None:
-        self.console.info(report["name"])
-        self.console.info(f"  declared platforms : {', '.join(report['declared_platforms'])}")
-        self.console.info(f"  tags               : {', '.join(report['tags']) or '-'}")
+    def _render_why(self, report: dict[str, object]) -> None:
+        self.console.info(cast(str, report["name"]))
+        declared = cast("list[str]", report["declared_platforms"])
+        tags = cast("list[str]", report["tags"])
+        self.console.info(f"  declared platforms : {', '.join(declared)}")
+        self.console.info(f"  tags               : {', '.join(tags) or '-'}")
         if not report["targeted"]:
             self.console.warn(
                 f"  not targeted on this platform ({report['platform']}) — skipped by sync/status"
             )
             return
-        r = report["resolved"]
+        r = cast("dict[str, object]", report["resolved"])
         applied = " (override applied)" if r["override_applied"] else ""
         self.console.info(f"  resolved for {report['platform']}{applied}:")
         self.console.info(f"    manager : {r['manager']}")
@@ -670,7 +673,7 @@ class Engine:
             self.console.info(f"    options : {r['options']}")
         if r["env"]:
             self.console.info(f"    env     : {r['env']}")
-        state = report["state"]
+        state = cast("dict[str, object]", report["state"])
         if "error" in state:
             self.console.warn(f"    state   : {state['error']}")
         else:
@@ -678,7 +681,7 @@ class Engine:
             self.console.info(f"    current : {state['current'] or '-'}")
             if state["latest"]:
                 self.console.info(f"    latest  : {state['latest']}")
-        lock = report["lock"]
+        lock = cast("dict[str, object]", report["lock"])
         if lock["installed_by_zconfig"]:
             held = " (pinned)" if lock["pinned"] else ""
             self.console.info(f"    lock    : installed by zconfig {lock['installed_at']}{held}")
@@ -693,17 +696,18 @@ class Engine:
             print(json.dumps(report, indent=2))
         else:
             self._render_doctor(report)
-        return Outcome(ok=report["ok"])
+        return Outcome(ok=cast(bool, report["ok"]))
 
-    def _build_doctor(self) -> dict:
+    def _build_doctor(self) -> dict[str, object]:
         known = {manager.name for manager in self.managers.all()}
         manifest = self.manifest_store.load()
         lock = self.lock_store.load()
 
-        report: dict = {
+        health_failures: list[dict[str, str]] = []
+        report: dict[str, object] = {
             "managers": {m.name: m.is_available() for m in self.managers.all()},
             "manifest_problems": validate_manifest(manifest, known),
-            "health_failures": [],
+            "health_failures": health_failures,
             "orphans": [o.name for o in find_orphans(manifest, lock)],
             "ok": True,
         }
@@ -717,29 +721,30 @@ class Engine:
                 and check
                 and not self.runner.run(["bash", "-c", check], read_only=True).ok
             ):
-                report["health_failures"].append({"tool": tool.name, "check": check})
-        report["ok"] = not report["manifest_problems"] and not report["health_failures"]
+                health_failures.append({"tool": tool.name, "check": check})
+        report["ok"] = not report["manifest_problems"] and not health_failures
         return report
 
-    def _render_doctor(self, report: dict) -> None:
+    def _render_doctor(self, report: dict[str, object]) -> None:
+        managers = cast("dict[str, bool]", report["managers"])
+        manifest_problems = cast("list[str]", report["manifest_problems"])
+        health_failures = cast("list[dict[str, str]]", report["health_failures"])
+        orphans = cast("list[str]", report["orphans"])
         self.console.info("Package managers:")
-        for name, available in report["managers"].items():
+        for name, available in managers.items():
             self.console.info(f"  [{'ok ' if available else '-- '}] {name}")
-        if report["manifest_problems"]:
+        if manifest_problems:
             self.console.error("Manifest problems:")
-            for problem in report["manifest_problems"]:
+            for problem in manifest_problems:
                 self.console.error(f"  {problem}")
-        for failure in report["health_failures"]:
+        for failure in health_failures:
             self.console.error(f"  {failure['tool']}: health check failed ({failure['check']})")
-        if report["orphans"]:
-            self.console.warn(
-                f"{len(report['orphans'])} orphaned tool(s) in the lock: "
-                + ", ".join(report["orphans"])
-            )
+        if orphans:
+            self.console.warn(f"{len(orphans)} orphaned tool(s) in the lock: " + ", ".join(orphans))
         if report["ok"]:
             self.console.ok("doctor: environment looks healthy.")
         else:
-            count = len(report["manifest_problems"]) + len(report["health_failures"])
+            count = len(manifest_problems) + len(health_failures)
             self.console.error(f"doctor found {count} problem(s).")
 
     # ── export ────────────────────────────────────────────────────────
@@ -757,10 +762,12 @@ class Engine:
                         name=str(entry["name"]),
                         manager=str(entry["manager"]),
                         package=str(entry.get("package", entry["name"])),
-                        tags=tuple(str(t) for t in raw_tags)
+                        tags=tuple(str(t) for t in cast("Iterable[object]", raw_tags))
                         if isinstance(raw_tags, Iterable)
                         else (),
-                        options=dict(raw_options) if isinstance(raw_options, Mapping) else {},
+                        options=dict(cast("Mapping[str, object]", raw_options))
+                        if isinstance(raw_options, Mapping)
+                        else {},
                     )
                 )
         if not discovered:
@@ -841,7 +848,7 @@ def _want(a: Assessment) -> str:
     return a.latest or a.desired_version
 
 
-def _assessment_dict(a: Assessment) -> dict:
+def _assessment_dict(a: Assessment) -> dict[str, object]:
     return {
         "name": a.name,
         "manager": a.manager,
