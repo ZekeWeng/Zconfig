@@ -36,12 +36,29 @@ jobs:
         run: python3 -m pip install --user ruff
       - name: Lint
         run: ~/.local/bin/ruff check engine tests
+      - name: Format check
+        run: ~/.local/bin/ruff format --check engine tests
+      - name: Install pyright
+        run: python3 -m pip install --user pyright
+      - name: Type-check (engine, standard mode)
+        run: ~/.local/bin/pyright
       - name: Compile (stdlib only — no third-party imports)
         run: python3 -m compileall -q engine
       - name: Unit tests
         run: PYTHONPATH=. python3 -m unittest discover -s tests
       - name: Smoke-test the CLI
         run: PYTHONPATH=. python3 -m engine --help > /dev/null
+      - name: doctor --json gate contract
+        # The README advertises `doctor --json | jq -e .ok` as a CI gate. A bare
+        # runner has no tools installed (ok would be false), so assert the gate
+        # *contract* instead: valid JSON exposing a boolean .ok plus the
+        # documented arrays. This catches regressions to the gate's shape.
+        run: |
+          PYTHONPATH=. python3 -m engine doctor --json \
+            | jq -e '(.ok | type == "boolean")
+                     and (.manifest_problems | type == "array")
+                     and (.health_failures | type == "array")
+                     and (.orphans | type == "array")' > /dev/null
 
   gitleaks:
     name: gitleaks

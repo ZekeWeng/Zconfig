@@ -1,0 +1,25 @@
+# Tooling config for the zconfig engine. The CLI is a zero-dependency, stdlib-only
+# tool run in place (`PYTHONPATH=. python3 -m engine`, or ./bin/zconfig), so there
+# is deliberately no build backend or runtime dependencies declared here — this
+# file exists to give ruff (lint + format) and pyright (type-check) a single
+# source of truth that CI, pre-commit, and `make lint` all share.
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# Ruff's defaults (pyflakes + core pycodestyle) plus import sorting (I) and
+# pyupgrade (UP). Line-length (E501) is intentionally not enforced: `ruff format`
+# handles wrapping, and a few long URLs and message strings read better unbroken.
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+
+[tool.pyright]
+# Scope: the engine only. The tests use terse fixtures (e.g. Tool(platforms="x"))
+# and dereference Optional returns the test data guarantees non-None, which trips
+# ~50 standard-mode diagnostics that are noise rather than bugs — so they are left
+# out of the gate. "standard" (not "strict") keeps the engine honest without the
+# broad annotation churn strict would demand on this stdlib-only codebase.
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+include = ["engine"]

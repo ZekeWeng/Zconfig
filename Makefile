@@ -36,8 +36,11 @@ check:       ## Bash syntax check every shell script
 	@for f in $(SHELLS); do bash -n "$$f" || exit 1; done
 	@echo "syntax ok ($(words $(SHELLS)) files)"
 
-lint:        ## Shellcheck every shell script (severity: warning)
+lint:        ## Shellcheck shell scripts + ruff (lint & format) the engine
 	@command -v shellcheck >/dev/null || { echo "install shellcheck: brew install shellcheck"; exit 1; }
 	@shellcheck -S warning $(SHELLS)
+	@command -v ruff >/dev/null || { echo "install ruff: brew install ruff"; exit 1; }
+	@ruff check engine tests
+	@ruff format --check engine tests
 
 all: check lint  ## Run check + lint
