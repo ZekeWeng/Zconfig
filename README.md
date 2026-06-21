@@ -11,7 +11,7 @@ Cross-platform dotfiles for macOS and Linux. One command bootstraps a complete d
 - **AI tooling** — Claude Code and Codex CLIs
 - **Languages** — Node, Python (uv), Go, Rust, Elixir
 - **Cross-platform** — One install path across macOS (Homebrew) and Linux (apt/dnf/pacman)
-- **Reproducible** — every download pinned with SHA256, every step idempotent
+- **Reproducible** — pinned binaries are SHA256-verified, plugins commit-locked, every step idempotent
 - **Corp-friendly** — `install-corp` profile: terminal styling (zsh + starship + tmux) plus a lean brew bundle (essentials + fonts). No languages, no DB/infra, no AI casks, no SSH/git identity.
 
 ## Quick start
