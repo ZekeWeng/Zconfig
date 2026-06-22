@@ -24,17 +24,17 @@ pkg_update_lists
 
 # Install order: base packages → distro repos → tools → fonts → AI CLIs
 run_installer essentials
-run_installer neovim
-run_installer eza
-run_installer lazygit
-run_installer gh
-run_installer vscode
-run_installer starship
-run_installer uv
-run_installer tree-sitter
-run_installer nerd-fonts
-run_installer claude-code
-run_installer codex
+run_optional_installer neovim
+run_optional_installer eza
+run_optional_installer lazygit
+run_optional_installer gh
+run_optional_installer vscode
+run_optional_installer starship
+run_optional_installer uv
+run_optional_installer tree-sitter
+run_optional_installer nerd-fonts
+run_optional_installer claude-code
+run_optional_installer codex
 
 # Set zsh as the login shell if it isn't already. chsh requires PAM auth on
 # most distros, which fails for passwordless users (CI runners, container
@@ -46,6 +46,8 @@ if [[ "$SHELL" != "$(command -v zsh)" ]]; then
         log_info "  Run manually when ready: chsh -s \$(command -v zsh)"
     fi
 fi
+
+report_optional_failures
 
 log_ok "Linux installation complete."
 log_info "Run 'exec zsh -l' or restart your terminal to apply changes."

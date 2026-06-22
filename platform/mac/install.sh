@@ -82,7 +82,9 @@ else
 fi
 
 # Direct-download installers (avoid brew cask flakiness for these tools)
-run_installer vscode
-run_installer claude-code
+run_optional_installer vscode
+run_optional_installer claude-code
+
+report_optional_failures
 
 log_ok "macOS installation complete."

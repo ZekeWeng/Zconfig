@@ -51,3 +51,35 @@ run_installer() {
     fi
     "$fn" "$@"
 }
+
+# Optional installers — non-critical tools (editors, fonts, AI CLIs). A failure
+# (usually a flaky download) is recorded and reported at the end, never fatal:
+# one bad fetch must not abort the whole install and skip everything after it.
+# Critical base steps (essentials, Homebrew) stay fatal — no point continuing
+# without them. The subshell re-enables `set -e` so the installer still fails
+# fast internally, while the `if` keeps that failure from aborting the caller.
+_ZCONFIG_FAILED_INSTALLERS=()
+
+run_optional_installer() {
+    local name="$1"; shift || true
+    # Disable -e in the caller so a failure here can't abort the run, but keep -e
+    # ON inside the subshell so the installer still stops at its first failed step.
+    # Testing the subshell with `if`/`||` would re-suppress -e *inside* it, so run
+    # it as a standalone statement and capture $? on the very next line.
+    local rc=0
+    set +e
+    ( set -e; run_installer "$name" "$@" )
+    rc=$?
+    set -e
+    if (( rc != 0 )); then
+        log_err "  ${name} failed — continuing (re-run 'make install' to retry)"
+        _ZCONFIG_FAILED_INSTALLERS+=("$name")
+    fi
+}
+
+report_optional_failures() {
+    (( ${#_ZCONFIG_FAILED_INSTALLERS[@]} == 0 )) && return 0
+    log_err "Some optional installers failed and were skipped:"
+    printf '  - %s\n' "${_ZCONFIG_FAILED_INSTALLERS[@]}" >&2
+    log_err "Re-run 'make install' to retry (already-installed tools are skipped)."
+}

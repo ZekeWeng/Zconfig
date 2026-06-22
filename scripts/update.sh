@@ -37,6 +37,46 @@ version_or_missing() {
     fi
 }
 
+# Run one maintenance step in a subshell that keeps `set -e` on (so a multi-
+# command step still stops at its first failed command) without that failure
+# aborting the whole update. The exit code lands in STEP_RC for the caller.
+STEP_RC=0
+try_step() {
+    set +e
+    ( set -e; "$@" )
+    STEP_RC=$?
+    set -e
+}
+
+_update_homebrew() {
+    brew update
+    brew upgrade
+    brew cleanup --prune=all
+    [[ -f "$ZCONFIG_DIR/platform/mac/Brewfile" ]] && brew bundle --file="$ZCONFIG_DIR/platform/mac/Brewfile"
+    [[ -f "$ZCONFIG_DIR/platform/mac/Brewfile.local" ]] && brew bundle --file="$ZCONFIG_DIR/platform/mac/Brewfile.local"
+    return 0
+}
+
+_update_vscode() {
+    rm -rf "/Applications/Visual Studio Code.app"
+    command -v brew &> /dev/null && rm -f "$(brew --prefix)/bin/code"
+    run_installer vscode
+}
+
+_update_claude() {
+    rm -f "$(command -v claude)"
+    run_installer claude-code
+}
+
+_update_system_packages() {
+    case "${PKG_MANAGER:-}" in
+        apt)    sudo apt-get update && sudo apt-get upgrade -y ;;
+        dnf)    sudo dnf upgrade -y ;;
+        pacman) sudo pacman -Syu --noconfirm ;;
+        *)      return 0 ;;
+    esac
+}
+
 log_ok "Updating system and dotfiles..."
 
 # ── Dotfiles repo ────────────────────────────────────────
@@ -67,11 +107,14 @@ fi
 if [[ "$(uname)" == "Darwin" ]]; then
     if command -v brew &> /dev/null; then
         log_info "Updating Homebrew..."
-        brew update && brew upgrade && brew cleanup --prune=all
-        [[ -f "$ZCONFIG_DIR/platform/mac/Brewfile" ]] && brew bundle --file="$ZCONFIG_DIR/platform/mac/Brewfile"
-        [[ -f "$ZCONFIG_DIR/platform/mac/Brewfile.local" ]] && brew bundle --file="$ZCONFIG_DIR/platform/mac/Brewfile.local"
-        log_ok "  Homebrew up to date"
-        recap_add "Homebrew: updated packages, casks, and cleanup"
+        try_step _update_homebrew
+        if (( STEP_RC == 0 )); then
+            log_ok "  Homebrew up to date"
+            recap_add "Homebrew: updated packages, casks, and cleanup"
+        else
+            log_err "  Homebrew update failed; continuing"
+            recap_add "Homebrew: update FAILED"
+        fi
     else
         recap_add "Homebrew: skipped (brew not installed)"
     fi
@@ -80,10 +123,13 @@ if [[ "$(uname)" == "Darwin" ]]; then
     # to 'manual' at install, so we refresh it here on demand.
     if [[ -d "/Applications/Visual Studio Code.app" ]]; then
         log_info "Updating VSCode (direct download)..."
-        rm -rf "/Applications/Visual Studio Code.app"
-        command -v brew &> /dev/null && rm -f "$(brew --prefix)/bin/code"
-        run_installer vscode
-        recap_add "VSCode: refreshed direct-download app"
+        try_step _update_vscode
+        if (( STEP_RC == 0 )); then
+            recap_add "VSCode: refreshed direct-download app"
+        else
+            log_err "  VSCode update failed; continuing"
+            recap_add "VSCode: update FAILED"
+        fi
     else
         recap_add "VSCode: skipped (app not found)"
     fi
@@ -91,20 +137,31 @@ fi
 
 # ── Linux: distro packages ───────────────────────────────
 if [[ "$(uname)" == "Linux" ]]; then
-    case "${PKG_MANAGER:-}" in
-        apt)    log_info "Upgrading apt packages..."; sudo apt-get update && sudo apt-get upgrade -y; recap_add "System packages: upgraded with apt" ;;
-        dnf)    log_info "Upgrading dnf packages...";  sudo dnf upgrade -y; recap_add "System packages: upgraded with dnf" ;;
-        pacman) log_info "Upgrading pacman packages..."; sudo pacman -Syu --noconfirm; recap_add "System packages: upgraded with pacman" ;;
-        *)      log_info "  no recognized package manager; skipping system upgrade"; recap_add "System packages: skipped (no recognized package manager)" ;;
-    esac
+    if [[ -z "${PKG_MANAGER:-}" ]]; then
+        log_info "  no recognized package manager; skipping system upgrade"
+        recap_add "System packages: skipped (no recognized package manager)"
+    else
+        log_info "Upgrading system packages ($PKG_MANAGER)..."
+        try_step _update_system_packages
+        if (( STEP_RC == 0 )); then
+            recap_add "System packages: upgraded with $PKG_MANAGER"
+        else
+            log_err "  system package upgrade failed; continuing"
+            recap_add "System packages: upgrade FAILED ($PKG_MANAGER)"
+        fi
+    fi
 fi
 
 # ── Claude Code (upstream installer always fetches latest) ─
 if command -v claude &> /dev/null; then
     log_info "Updating Claude Code..."
-    rm -f "$(command -v claude)"
-    run_installer claude-code
-    recap_add "Claude Code: refreshed from upstream installer"
+    try_step _update_claude
+    if (( STEP_RC == 0 )); then
+        recap_add "Claude Code: refreshed from upstream installer"
+    else
+        log_err "  Claude Code update failed; continuing"
+        recap_add "Claude Code: update FAILED"
+    fi
 else
     recap_add "Claude Code: skipped (claude not installed)"
 fi
@@ -112,9 +169,14 @@ fi
 # ── Neovim plugins ───────────────────────────────────────
 if command -v nvim &> /dev/null; then
     log_info "Syncing Neovim plugins..."
-    nvim --headless "+Lazy! sync" +qa
-    log_ok "  plugins synced"
-    recap_add "Neovim plugins: synced with Lazy"
+    try_step nvim --headless "+Lazy! sync" +qa
+    if (( STEP_RC == 0 )); then
+        log_ok "  plugins synced"
+        recap_add "Neovim plugins: synced with Lazy"
+    else
+        log_err "  Neovim plugin sync failed; continuing"
+        recap_add "Neovim plugins: sync FAILED"
+    fi
 else
     recap_add "Neovim plugins: skipped (nvim not installed)"
 fi
@@ -122,16 +184,26 @@ fi
 # ── Language toolchains ──────────────────────────────────
 if command -v rustup &> /dev/null; then
     log_info "Updating Rust..."
-    rustup update
-    recap_add "Rust: updated rustup toolchains"
+    try_step rustup update
+    if (( STEP_RC == 0 )); then
+        recap_add "Rust: updated rustup toolchains"
+    else
+        log_err "  Rust update failed; continuing"
+        recap_add "Rust: update FAILED"
+    fi
 else
     recap_add "Rust: skipped (rustup not installed)"
 fi
 
 if command -v npm &> /dev/null; then
     log_info "Updating npm globals..."
-    npm update -g
-    recap_add "npm globals: updated"
+    try_step npm update -g
+    if (( STEP_RC == 0 )); then
+        recap_add "npm globals: updated"
+    else
+        log_err "  npm global update failed; continuing"
+        recap_add "npm globals: update FAILED"
+    fi
 else
     recap_add "npm globals: skipped (npm not installed)"
 fi
