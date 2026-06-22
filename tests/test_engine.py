@@ -554,7 +554,7 @@ class BrewCacheTests(unittest.TestCase):
 
 
 class VersionMatchTests(unittest.TestCase):
-    """version_matches tolerates v-prefixes, apt epochs, and Debian revisions."""
+    """version_matches tolerates v-prefixes, apt epochs, Debian revisions, and +dfsg."""
 
     def test_plain_and_prefix_pins(self):
         from engine.domain import version_matches
@@ -570,6 +570,7 @@ class VersionMatchTests(unittest.TestCase):
         # apt reports the full Debian version; a manifest pin is plain.
         self.assertTrue(version_matches("2:1.2.3-1ubuntu0", "1.2.3"))
         self.assertTrue(version_matches("1.2.3-1ubuntu0", "1.2.3"))
+        self.assertTrue(version_matches("1.2.3+dfsg-1", "1.2.3"))  # repackaged upstream
         self.assertTrue(version_matches("2:1.2.3-1ubuntu0", "1.2"))
         self.assertFalse(version_matches("2:2.0.0", "1.2.3"))
 

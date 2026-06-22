@@ -303,10 +303,11 @@ def version_matches(installed: str, pinned: str) -> bool:
     """Does ``installed`` satisfy the ``pinned`` request? Tolerates a leading "v",
     a Debian ``epoch:`` prefix on the installed side (apt reports ``2:1.2.3``), and
     prefix pins (pinning "1.2" matches "1.2.3"; "1.2.3" matches the Debian revision
-    "1.2.3-1ubuntu0"). Pure; shared by assess and the pin-time satisfiability check."""
+    "1.2.3-1ubuntu0" and repackaged-upstream "1.2.3+dfsg-1"). Pure; shared by assess
+    and the pin-time satisfiability check."""
     a = _normalize_version(installed)
     b = _normalize_version(pinned)
-    return a == b or a.startswith(b + ".") or a.startswith(b + "-")
+    return a == b or a.startswith(b + ".") or a.startswith(b + "-") or a.startswith(b + "+")
 
 
 def _normalize_version(value: str) -> str:
