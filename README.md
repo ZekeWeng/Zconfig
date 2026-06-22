@@ -61,7 +61,7 @@ zconfig list       # inventory the manifest (fast; no live probing)
 zconfig status     # show drift: missing / outdated / pinned / orphaned
 zconfig sync       # install missing, fix pins, deprovision orphans (respects pins)
 zconfig update     # interactively update outdated tools: [u]pdate [s]kip [p]in [a]ll
-zconfig bootstrap  # fresh machine: ensure prerequisites, then sync
+zconfig bootstrap  # fresh machine: check prerequisites, then sync
 zconfig add NAME --manager brew --package NAME --add-tags core
 zconfig remove NAME            # uninstall + strip from the manifest
 zconfig pin NAME [VERSION]     # lock a version (default: the installed one)
