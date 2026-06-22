@@ -13,7 +13,7 @@ jobs:
     name: shellcheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run shellcheck
         uses: ludeeus/action-shellcheck@master
         with:
@@ -33,8 +33,8 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         python-version: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install pinned tooling
@@ -42,7 +42,7 @@ jobs:
         # is reproducible — a floating release can change rules and pass one gate
         # while failing another. No --user: setup-python's bin is already on PATH
         # (and the --user dir differs on macOS), so the tools are called bare.
-        run: python3 -m pip install ruff==0.15.6 pyright==1.1.410
+        run: python3 -m pip install ruff==0.15.18 pyright==1.1.410
       - name: Lint
         run: ruff check engine tests
       - name: Format check
@@ -78,11 +78,11 @@ jobs:
       contents: read
       pull-requests: read  # gitleaks lists PR commits; private repos enforce this scope
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Scan for secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -90,7 +90,7 @@ jobs:
     name: validate json
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate every tracked JSON file
         run: |
           set -euo pipefail
@@ -107,7 +107,7 @@ jobs:
     name: validate claude skills & rules
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install pyyaml
         run: python3 -m pip install --user pyyaml
       - name: Parse frontmatter
@@ -138,7 +138,7 @@ jobs:
     name: smoke-test corp profile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: zconfig
       - name: Run install in corp profile

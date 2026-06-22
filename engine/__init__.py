@@ -6,4 +6,4 @@ adapters, ``services`` the application layer, ``commands`` the CLI command
 table, and ``__main__`` the composition root that wires concretes together.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
