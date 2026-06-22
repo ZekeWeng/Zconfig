@@ -28,13 +28,13 @@ install_essentials() {
             ;;
         dnf)
             pkg_install \
-                neovim git zsh tmux fzf ripgrep fd-find ShellCheck \
+                git zsh tmux fzf ripgrep fd-find ShellCheck \
                 python3 python3-pip \
                 xclip curl wget unzip fontconfig
             ;;
         pacman)
             pkg_install \
-                neovim git zsh tmux fzf ripgrep fd shellcheck \
+                git zsh tmux fzf ripgrep fd shellcheck \
                 python python-pip \
                 xclip curl wget unzip fontconfig
             ;;

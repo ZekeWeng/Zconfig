@@ -34,20 +34,13 @@ autocmd("FileType", {
 autocmd("FileType", {
   group = vim.api.nvim_create_augroup("close_with_q", {}),
   pattern = {
-    "PlenaryTestPopup",
+    "checkhealth",
     "help",
     "lspinfo",
     "man",
     "notify",
     "qf",
     "query",
-    "spectre_panel",
-    "startuptime",
-    "tsplayground",
-    "neotest-output",
-    "checkhealth",
-    "neotest-summary",
-    "neotest-output-panel",
   },
   callback = function(event)
     vim.bo[event.buf].buflisted = false

@@ -1,7 +1,6 @@
 # Starship configuration for compact CLI visualization
 # Format: ~/path   branch !modified ?untracked ❯
 
-# Global timeout setting
 command_timeout = 5000
 
 # Define the prompt format

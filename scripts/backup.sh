@@ -16,7 +16,6 @@ BACKUP_PATH="$BACKUP_DIR/backup_$(date +%Y%m%d_%H%M%S)"
 log_ok "Creating backup..."
 mkdir -p "$BACKUP_PATH"
 
-# Copy each symlink target (file or directory) into the backup.
 for entry in "${ZCONFIG_SYMLINKS[@]}"; do
     tgt="${entry##*::}"
     src_path="$HOME/$tgt"

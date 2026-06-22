@@ -9,7 +9,6 @@ from __future__ import annotations
 from ..domain import ResolvedTool
 from ..ports import CommandResult, PackageManager
 from . import register
-from ._util import nth_token
 
 
 @register
@@ -36,7 +35,8 @@ class CargoManager(PackageManager):
         line = self._installed_line(tool.package)
         if not line:
             return None
-        version = nth_token(line, 1)  # "name vX.Y.Z:"
+        parts = line.split()  # "name vX.Y.Z:"
+        version = parts[1] if len(parts) > 1 else None
         return version.lstrip("v").rstrip(":") if version else None
 
     def latest_version(self, tool: ResolvedTool) -> str | None:

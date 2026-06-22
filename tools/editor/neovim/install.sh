@@ -37,8 +37,12 @@ install_neovim() {
     fi
 
     log_info "Installing Neovim ${NVIM_VERSION} via AppImage (pinned)..."
-    # Remove a distro-managed neovim that would conflict on PATH.
-    [[ "$PKG_MANAGER" == "apt" ]] && sudo apt-get remove -y neovim &> /dev/null || true
+    # Remove a distro-managed neovim that would shadow the pinned AppImage on PATH.
+    case "$PKG_MANAGER" in
+        apt)    sudo apt-get remove -y neovim &> /dev/null || true ;;
+        dnf)    sudo dnf remove -y neovim &> /dev/null || true ;;
+        pacman) sudo pacman -R --noconfirm neovim &> /dev/null || true ;;
+    esac
 
     local tmp="/tmp/${asset}"
     verify_and_download \

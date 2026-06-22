@@ -60,8 +60,8 @@ setopt HIST_IGNORE_DUPS HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS HIST_IGNORE_SPAC
 
 # ── Keybindings (emacs base + macOS-friendly word motion) ─
 bindkey -e
-bindkey '^A'      beginning-of-line   # Ctrl+A
-bindkey '^E'      end-of-line         # Ctrl+E
+bindkey '^A'      beginning-of-line
+bindkey '^E'      end-of-line
 bindkey '^[[1;3D' backward-word       # Option+Left
 bindkey '^[[1;3C' forward-word        # Option+Right
 bindkey '^[b'     backward-word       # Option+B
