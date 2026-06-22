@@ -605,6 +605,37 @@ class GoVersionTests(unittest.TestCase):
         self.assertEqual(GoManager(FakeGo()).latest_version(tool), "1.10.0")
 
 
+class BrewVersionTests(unittest.TestCase):
+    """brew installed_version returns the highest installed keg, not the last one
+    `brew list --versions` happens to print (brew does not sort that output)."""
+
+    def test_installed_version_is_highest_keg_not_positional(self):
+        from engine.domain import ResolvedTool
+        from engine.managers.brew import BrewManager
+
+        class FakeBrew(CommandRunner):
+            def run(self, args, *, capture=True, read_only=False, env=None):
+                if args[:3] == ["brew", "list", "--versions"]:
+                    # highest keg listed first; positional [-1] would pick the older 1.9.3
+                    return CommandResult(0, "libgit2 1.9.4 1.9.3\n", "")
+                return CommandResult(0, "", "")
+
+            def which(self, program):
+                return "/opt/homebrew/bin/brew"
+
+        tool = ResolvedTool(
+            name="libgit2",
+            manager="brew",
+            package="libgit2",
+            version="latest",
+            tags=(),
+            pre_install=None,
+            post_install=None,
+            options={},
+        )
+        self.assertEqual(BrewManager(FakeBrew()).installed_version(tool), "1.9.4")
+
+
 class BrewfileManifestSyncTests(unittest.TestCase):
     """platform/mac/Brewfile and software.toml are two install paths for the same
     brew software (brew bundle vs the engine's brew adapter); guard against drift."""

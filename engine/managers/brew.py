@@ -10,6 +10,7 @@ and the manifest version field is treated as the held version.
 from __future__ import annotations
 
 import json
+import re
 
 from ..domain import ResolvedTool
 from ..ports import CommandResult, CommandRunner, PackageManager
@@ -18,6 +19,14 @@ from . import register
 # Suppress brew's implicit `brew update` (a network round-trip) on every read.
 # Status reflects locally-known state; an explicit `brew update` still refreshes.
 _NO_AUTO_UPDATE = {"HOMEBREW_NO_AUTO_UPDATE": "1"}
+
+
+def _version_key(version: str) -> tuple[int, ...]:
+    """Order key for a Homebrew version. ``brew list --versions`` lists a formula's
+    installed kegs in no guaranteed order, so pick the highest explicitly instead of
+    trusting position. Split on brew's separators (``3.14.4_1``, ``2026-05-14``);
+    non-numeric pieces sort low so an odd tag never outranks a real release."""
+    return tuple(int(p) if p.isdigit() else 0 for p in re.split(r"[._-]", version))
 
 
 @register
@@ -52,7 +61,7 @@ class BrewManager(PackageManager):
                 for line in result.stdout.splitlines():
                     parts = line.split()
                     if len(parts) >= 2:
-                        cache[parts[0]] = parts[-1]  # highest of possibly several versions
+                        cache[parts[0]] = max(parts[1:], key=_version_key)
             if cask:
                 self._casks = cache
             else:
