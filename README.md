@@ -16,19 +16,15 @@ Cross-platform dotfiles for macOS and Linux. One command bootstraps a complete d
 
 ## Quick start
 
-One command on a fresh machine — clones to `~/.zconfig`, installs Homebrew if missing (macOS), prompts for your git identity, and runs the full install:
+The repo is **private** — the public `curl … | bash` bootstrap no longer works. Clone over SSH (needs repo access and an SSH key on your GitHub account), then install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ZekeWeng/Zconfig/main/bootstrap.sh | bash
-```
-
-Corp profile: `ZCONFIG_PROFILE=corp curl -fsSL ... | bash`. Or clone manually:
-
-```bash
-git clone https://github.com/ZekeWeng/Zconfig.git ~/.zconfig
+git clone git@github.com:ZekeWeng/Zconfig.git ~/.zconfig
 cd ~/.zconfig && make install
 exec zsh
 ```
+
+Corp profile: `make install-corp` from the cloned repo.
 
 macOS prereq: `xcode-select --install` (git). Run `make` (no args) for the menu.
 
