@@ -8,7 +8,7 @@ nothing that already worked was moved, renamed, or deleted.
 
 The following kept their exact location and behavior:
 
-- `install.sh`, `bootstrap.sh`, `Makefile` (only new targets appended)
+- `install.sh`, `Makefile` (only new targets appended)
 - `platform/{mac,linux}/install.sh`, both `Brewfile`s
 - `tools/<category>/<tool>/` — every per-tool installer and config
 - `lib/`, `bootstrap/`, `scripts/`
