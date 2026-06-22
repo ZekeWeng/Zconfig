@@ -471,6 +471,7 @@ class _StubManager(PackageManager):
         self.installs_exact_version = installs_exact_version
         self._current = current
         self.installs: list[str] = []
+        self.pinned_versions: list[str] = []
 
     def is_available(self):
         return True
@@ -495,6 +496,7 @@ class _StubManager(PackageManager):
         return CommandResult(0, "", "")
 
     def pin(self, tool):
+        self.pinned_versions.append(tool.version)
         return CommandResult(0, "", "")
 
 
@@ -696,6 +698,38 @@ class PinThrashTests(unittest.TestCase):
         )
         self._engine(mgr).sync(assume_yes=True)
         self.assertEqual(mgr.installs, ["rg"])  # drift gets fixed
+
+
+class PinCommandTests(unittest.TestCase):
+    """`pin NAME VERSION` must enforce the new version, not re-pin the old one."""
+
+    def _engine(self, manager, *, manifest_version):
+        from engine.services import Engine
+
+        path = Path(tempfile.mktemp(suffix=".toml"))
+        TomlManifestStore(path).save(
+            Manifest(
+                tools=(tool(manager=manager.name, version=manifest_version, platforms=("macos",)),)
+            )
+        )
+        return Engine(
+            manifest_store=TomlManifestStore(path),
+            lock_store=JsonLockStore(Path(tempfile.mktemp())),
+            managers=_OneManager(manager),
+            runner=FakeRunner(),
+            console=_SilentConsole(),
+            clock=_FixedClock(),
+            platform="macos",
+        )
+
+    def test_repin_hands_manager_the_new_version(self):
+        # Re-pinning an already-pinned exact-version tool must resolve the updated
+        # manifest entry, so cargo/pipx/go force-install the new pin — not the old.
+        mgr = _StubManager(
+            FakeRunner(), name="cargoish", installs_exact_version=True, current="1.0.0"
+        )
+        self._engine(mgr, manifest_version="1.0.0").pin("rg", "2.0.0")
+        self.assertEqual(mgr.pinned_versions, ["2.0.0"])
 
 
 class _HealthRunner(CommandRunner):

@@ -509,10 +509,14 @@ class Engine:
                 f"{manager.name} cannot install exact versions; {name} will report "
                 f"pin-unsatisfiable until {version} is what's installed (have {installed})."
             )
-        manifest = manifest.with_tool(replace_tool_version(tool, version))
+        repinned = replace_tool_version(tool, version)
+        manifest = manifest.with_tool(repinned)
         self._save_manifest(manifest)
-        if resolved and manager and manager.is_available():
-            manager.pin(resolved)
+        # Resolve the *updated* tool so an exact-version manager (cargo/pipx/go)
+        # enforces the new pin, instead of the stale version `resolved` carries.
+        target = repinned.resolve(self.platform)
+        if target and manager and manager.is_available():
+            manager.pin(target)
         lock = self.lock_store.load()
         entry = lock.get(name)
         if entry:
