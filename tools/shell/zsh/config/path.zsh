@@ -1,6 +1,9 @@
 # Local bin
 export PATH="$HOME/.local/bin:$PATH"
 
+# zconfig CLI — declarative software engine (bin/zconfig)
+[[ -d "$HOME/.zconfig/bin" ]] && export PATH="$HOME/.zconfig/bin:$PATH"
+
 # Go
 if command -v go &> /dev/null; then
     export GOPATH="$HOME/go"

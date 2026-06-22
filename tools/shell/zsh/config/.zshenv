@@ -21,10 +21,11 @@ export VISUAL="nvim"
 export LANG="en_US.UTF-8"
 export LC_ALL="en_US.UTF-8"
 
-# Homebrew (macOS — Apple Silicon vs. Intel)
-if [[ -d "/opt/homebrew" ]]; then
+# Homebrew (macOS — Apple Silicon vs. Intel). Probe the brew binary, not a
+# fixed directory, so a relocated or partial install still resolves.
+if [[ -x "/opt/homebrew/bin/brew" ]]; then
     export HOMEBREW_PREFIX="/opt/homebrew"
-elif [[ -d "/usr/local/Homebrew" ]]; then
+elif [[ -x "/usr/local/bin/brew" ]]; then
     export HOMEBREW_PREFIX="/usr/local"
 fi
 if [[ -n "${HOMEBREW_PREFIX:-}" ]]; then
