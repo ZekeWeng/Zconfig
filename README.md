@@ -157,7 +157,7 @@ RUSTFLAGS = "-C target-cpu=native"
 
 ### Relationship to the dotfiles installer
 
-The two coexist. `install.sh` / the Brewfile remain the reference for *how* brew installs and how dotfiles are symlinked; the `zconfig` brew adapter **delegates** to `brew`, and Linux tools with a bespoke pinned installer delegate to it via the `script` manager (`run_installer <name>`). The manifest adds the cross-manager, lockfile, drift, and update-prompt layer on top — it does not replace the pinned installers. See `MIGRATION.md`.
+The two coexist. `install.sh` / the Brewfile remain the reference for *how* brew installs and how dotfiles are symlinked; the `zconfig` brew adapter **delegates** to `brew`, and Linux tools with a bespoke pinned installer delegate to it via the `script` manager (`run_installer <name>`). The manifest adds the cross-manager, lockfile, drift, and update-prompt layer on top — it does not replace the pinned installers.
 
 ### Writing a new adapter
 

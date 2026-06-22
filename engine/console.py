@@ -67,7 +67,7 @@ class TerminalConsole(Console):
                 widths[i] = max(widths[i], len(cell))
         header_line = "  ".join(h.ljust(widths[i]) for i, h in enumerate(headers))
         print(self._paint(_YELLOW, header_line))
-        print(self._paint(_DIM, "  ".join("-" * widths[i] for i in range(len(headers)))))
+        print(self._paint(_DIM, "  ".join("-" * w for w in widths)))
         for row in rows:
             cells: list[str] = []
             for i, cell in enumerate(row):

@@ -15,7 +15,6 @@ fi
 alias open='xdg-open'
 
 # Key bindings (fix keys that misbehave on Linux terminals)
-bindkey '\e[3~' delete-char        # Delete key
 bindkey '\e[H'  beginning-of-line  # Home key
 bindkey '\e[F'  end-of-line        # End key
 bindkey '\e[1~' beginning-of-line  # Home key (alt)

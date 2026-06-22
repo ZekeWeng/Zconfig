@@ -56,7 +56,6 @@ ensure_homebrew() {
     command -v brew &> /dev/null || { log_err "Homebrew installation failed"; exit 1; }
 }
 
-# Parse arguments
 INSTALL_BREW=true
 for arg in "$@"; do
     case "$arg" in

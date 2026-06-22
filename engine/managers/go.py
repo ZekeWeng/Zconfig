@@ -7,7 +7,7 @@ that heuristic is wrong. Uninstall removes the binary from GOBIN/GOPATH/bin.
 
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 from ..domain import ResolvedTool
 from ..ports import CommandResult, PackageManager
@@ -35,23 +35,24 @@ class GoManager(PackageManager):
         path = tool.package.split("@", 1)[0].rstrip("/")
         return path.split("/")[-1]
 
-    def _gobin(self) -> str:
+    def _gobin(self) -> Path:
         result = self.runner.run(["go", "env", "GOBIN"], read_only=True)
         gobin = result.stdout.strip() if result.ok else ""
         if gobin:
-            return gobin
+            return Path(gobin)
         gopath = self.runner.run(["go", "env", "GOPATH"], read_only=True)
-        root = gopath.stdout.strip() if gopath.ok else os.path.expanduser("~/go")
-        return os.path.join(root, "bin")
+        root = gopath.stdout.strip() if gopath.ok else str(Path.home() / "go")
+        return Path(root) / "bin"
 
     def is_installed(self, tool: ResolvedTool) -> bool:
-        return self.runner.which(self._binary_name(tool)) is not None or os.path.exists(
-            os.path.join(self._gobin(), self._binary_name(tool))
+        return (
+            self.runner.which(self._binary_name(tool)) is not None
+            or (self._gobin() / self._binary_name(tool)).exists()
         )
 
     def installed_version(self, tool: ResolvedTool) -> str | None:
-        binary = self.runner.which(self._binary_name(tool)) or os.path.join(
-            self._gobin(), self._binary_name(tool)
+        binary = self.runner.which(self._binary_name(tool)) or str(
+            self._gobin() / self._binary_name(tool)
         )
         result = self.runner.run(["go", "version", "-m", binary], read_only=True)
         if not result.ok:
@@ -84,9 +85,9 @@ class GoManager(PackageManager):
         return self.runner.run(["go", "install", f"{base}@latest"], capture=False)
 
     def uninstall(self, tool: ResolvedTool) -> CommandResult:
-        target = os.path.join(self._gobin(), self._binary_name(tool))
-        if os.path.exists(target):
-            return self.runner.run(["rm", "-f", target])
+        target = self._gobin() / self._binary_name(tool)
+        if target.exists():
+            return self.runner.run(["rm", "-f", str(target)])
         return CommandResult(0, "", "go binary not found; nothing to remove")
 
     def pin(self, tool: ResolvedTool) -> CommandResult:
