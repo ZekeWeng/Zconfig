@@ -23,7 +23,18 @@ ensure_xcode_clt() {
     xcode-select -p &> /dev/null && return 0
     log_info "Installing Xcode Command Line Tools..."
     xcode-select --install &> /dev/null || true
-    until xcode-select -p &> /dev/null; do sleep 5; done
+    # Wait for the GUI installer to finish, but fail fast instead of hanging
+    # forever if it is cancelled, stalls, or there is no GUI to answer it.
+    local waited=0
+    until xcode-select -p &> /dev/null; do
+        if (( waited >= 1800 )); then
+            log_err "Xcode Command Line Tools still missing after 30m."
+            log_err "Finish 'xcode-select --install', then re-run."
+            exit 1
+        fi
+        sleep 5
+        waited=$(( waited + 5 ))
+    done
     log_ok "Xcode Command Line Tools installed."
 }
 
@@ -33,8 +44,10 @@ ensure_xcode_clt() {
 ensure_homebrew() {
     command -v brew &> /dev/null && return 0
     log_info "Installing Homebrew..."
-    NONINTERACTIVE=1 /bin/bash -c \
-        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    local installer
+    installer="$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+        || { log_err "Could not download the Homebrew installer (check your network)"; exit 1; }
+    NONINTERACTIVE=1 /bin/bash -c "$installer"
     if [[ -x /opt/homebrew/bin/brew ]]; then
         eval "$(/opt/homebrew/bin/brew shellenv)"
     elif [[ -x /usr/local/bin/brew ]]; then
