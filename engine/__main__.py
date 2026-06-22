@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import json
 import os
 import sys
 import tomllib
@@ -155,6 +156,12 @@ def main(argv: list[str] | None = None) -> int:
         # .path is a TomlManifestStore detail (see _require_manifest).
         store_path = cast(TomlManifestStore, engine.manifest_store).path
         console.error(f"{store_path}: invalid TOML — {exc}")
+        return 1
+    except json.JSONDecodeError as exc:
+        # A corrupt lockfile surfaces clearly instead of as a traceback, and is
+        # never silently overwritten (JsonLockStore.load refuses to reset it).
+        lock_path = cast(JsonLockStore, engine.lock_store).path
+        console.error(f"{lock_path}: corrupt lockfile — {exc}. Inspect or delete it.")
         return 1
     except OSError as exc:
         console.error(f"file error: {exc}")

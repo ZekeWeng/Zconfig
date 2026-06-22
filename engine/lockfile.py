@@ -23,12 +23,13 @@ class JsonLockStore(LockStore):
         self.path = path
 
     def load(self) -> Lock:
+        # Missing is the normal first run: an empty lock. A *corrupt* lock must
+        # fail loud, not silently reset — returning Lock() here would make every
+        # installed tool look untracked, and the next save() would overwrite the
+        # unreadable file, destroying the record. (toml_io.load fails loud too.)
         if not self.path.exists():
             return Lock()
-        try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return Lock()
+        data = json.loads(self.path.read_text(encoding="utf-8"))
         entries = tuple(
             LockEntry(
                 name=name,

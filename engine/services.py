@@ -338,11 +338,20 @@ class Engine:
         orphans = find_orphans(manifest, lock)
         removed = 0
         for orphan in orphans:
+            manager = self.managers.get(orphan.manager)
+            # An unreachable manager can't uninstall, so dropping the lock entry
+            # would forget a still-installed tool and falsely report it gone.
+            # Keep it tracked until the manager is back, then sync deprovisions it.
+            if not (manager and manager.is_available()):
+                self.console.warn(
+                    f"  kept {orphan.name}: {orphan.manager} unavailable; "
+                    f"uninstall it by hand to drop it from the lock"
+                )
+                continue
             prompt = f"Remove orphaned {orphan.name} ({orphan.manager}:{orphan.package})?"
             if not (assume_yes or self.console.confirm(prompt, default=False)):
                 self.console.info(f"  kept {orphan.name}")
                 continue
-            manager = self.managers.get(orphan.manager)
             tool = ResolvedTool(
                 name=orphan.name,
                 manager=orphan.manager,
@@ -353,13 +362,10 @@ class Engine:
                 post_install=None,
                 options=dict(orphan.options),
             )
-            if manager and manager.is_available():
-                result = manager.uninstall(tool)
-                if not result.ok and not self.dry_run:
-                    self.console.error(
-                        f"  {orphan.name}: uninstall failed: {result.stderr.strip()}"
-                    )
-                    continue
+            result = manager.uninstall(tool)
+            if not result.ok and not self.dry_run:
+                self.console.error(f"  {orphan.name}: uninstall failed: {result.stderr.strip()}")
+                continue
             lock = lock.remove(orphan.name)
             removed += 1
             self.console.ok(f"  removed {orphan.name}")
@@ -459,9 +465,19 @@ class Engine:
             self.console.error(f"{name} is not in the manifest.")
             return Outcome(ok=False)
         resolved = tool.resolve(self.platform)
+        # Drop the lock entry only once the tool is actually gone. If we can't
+        # reach the manager or the uninstall fails, the tool is likely still
+        # installed — keep it tracked so it surfaces as an orphan to retry,
+        # rather than forgetting it (which would falsely report it removed).
+        keep_tracked = False
         if resolved is not None:
             manager = self.managers.get(resolved.manager)
-            if manager and manager.is_available() and manager.is_installed(resolved):
+            if manager is None or not manager.is_available():
+                self.console.warn(
+                    f"  {resolved.manager} unavailable; left {name} installed and still tracked"
+                )
+                keep_tracked = True
+            elif manager.is_installed(resolved):
                 if assume_yes or self.console.confirm(
                     f"Uninstall {name} ({resolved.manager}:{resolved.package})?", default=False
                 ):
@@ -470,10 +486,14 @@ class Engine:
                         self.console.ok(f"  uninstalled {name}")
                     else:
                         self.console.error(f"  uninstall failed: {result.stderr.strip()}")
+                        keep_tracked = True
                 else:
                     self.console.info(f"  left {name} installed")
         manifest = manifest.without_tool(name)
         self._save_manifest(manifest)
+        if keep_tracked:
+            self.console.ok(f"Removed {name} from the manifest (still tracked until uninstalled).")
+            return Outcome()
         lock = self.lock_store.load().remove(name)
         self._save_lock(lock)
         self.console.ok(f"Removed {name} from the manifest.")

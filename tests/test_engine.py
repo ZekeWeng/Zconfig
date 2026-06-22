@@ -218,6 +218,15 @@ class LockRoundTripTests(unittest.TestCase):
     def test_missing_file_is_empty_lock(self):
         self.assertEqual(JsonLockStore(Path(tempfile.mktemp())).load(), Lock())
 
+    def test_corrupt_lockfile_fails_loud(self):
+        # A corrupt lock must raise, not silently read as empty: an empty read
+        # would drop every tool from tracking and the next save() would clobber
+        # the unreadable file. (Mirrors toml_io, which lets bad TOML propagate.)
+        path = Path(tempfile.mktemp(suffix=".lock"))
+        path.write_text("{ truncated json", encoding="utf-8")
+        with self.assertRaises(json.JSONDecodeError):
+            JsonLockStore(path).load()
+
 
 class FakeRunner(CommandRunner):
     """Records mutating calls; answers a programmable map for read-only probes."""
@@ -698,6 +707,86 @@ class PinThrashTests(unittest.TestCase):
         )
         self._engine(mgr).sync(assume_yes=True)
         self.assertEqual(mgr.installs, ["rg"])  # drift gets fixed
+
+
+class OrphanRemovalSafetyTests(unittest.TestCase):
+    """An orphan whose manager is unreachable must be kept, not silently forgotten."""
+
+    def test_orphan_with_unavailable_manager_is_kept(self):
+        from engine.services import Engine
+
+        manifest_path = Path(tempfile.mktemp(suffix=".toml"))
+        lock_path = Path(tempfile.mktemp(suffix=".lock"))
+        # Manifest declares nothing; the lock records a tool whose manager is not
+        # available here (e.g. a brew entry synced onto a box without brew).
+        TomlManifestStore(manifest_path).save(Manifest(tools=()))
+        JsonLockStore(lock_path).save(
+            Lock(entries=(LockEntry("ripgrep", "unreachable", "ripgrep", "14.0.0", "now"),))
+        )
+
+        class _UnavailableManager(_StubManager):
+            def is_available(self):
+                return False
+
+        mgr = _UnavailableManager(
+            FakeRunner(), name="unreachable", installs_exact_version=False, current="14.0.0"
+        )
+        engine = Engine(
+            manifest_store=TomlManifestStore(manifest_path),
+            lock_store=JsonLockStore(lock_path),
+            managers=_OneManager(mgr),
+            runner=FakeRunner(),
+            console=_SilentConsole(),
+            clock=_FixedClock(),
+            platform="macos",
+        )
+
+        outcome = engine.sync(assume_yes=True)
+
+        self.assertTrue(outcome.ok)
+        # Still installed as far as we know -> must remain tracked in the lock.
+        tracked = [entry.name for entry in JsonLockStore(lock_path).load().entries]
+        self.assertIn("ripgrep", tracked)
+
+
+class RemoveSafetyTests(unittest.TestCase):
+    """`remove` must not forget a tool from the lock when the uninstall fails."""
+
+    def test_failed_uninstall_keeps_lock_entry(self):
+        from engine.services import Engine
+
+        manifest_path = Path(tempfile.mktemp(suffix=".toml"))
+        lock_path = Path(tempfile.mktemp(suffix=".lock"))
+        TomlManifestStore(manifest_path).save(
+            Manifest(tools=(tool(name="rg", manager="failer", platforms=("macos",)),))
+        )
+        JsonLockStore(lock_path).save(
+            Lock(entries=(LockEntry("rg", "failer", "ripgrep", "14.0.0", "now"),))
+        )
+
+        class _FailingUninstall(_StubManager):
+            def uninstall(self, t):
+                return CommandResult(1, "", "uninstall blew up")
+
+        mgr = _FailingUninstall(
+            FakeRunner(), name="failer", installs_exact_version=False, current="14.0.0"
+        )
+        engine = Engine(
+            manifest_store=TomlManifestStore(manifest_path),
+            lock_store=JsonLockStore(lock_path),
+            managers=_OneManager(mgr),
+            runner=FakeRunner(),
+            console=_SilentConsole(),
+            clock=_FixedClock(),
+            platform="macos",
+        )
+
+        engine.remove("rg", assume_yes=True)
+
+        # Stripped from the manifest (no longer declared)...
+        self.assertIsNone(TomlManifestStore(manifest_path).load().get("rg"))
+        # ...but still tracked in the lock, since it's still installed -> retry.
+        self.assertIn("rg", [entry.name for entry in JsonLockStore(lock_path).load().entries])
 
 
 class PinCommandTests(unittest.TestCase):
