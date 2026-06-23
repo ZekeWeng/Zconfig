@@ -8,6 +8,8 @@ paths:
 
 Idiomatic Python for new code, 3.12+ baseline.
 
+> This repo's `zconfig` engine must run on Python 3.11+ (stdlib `tomllib`). In engine code, avoid 3.12-only APIs like `itertools.batched`.
+
 ## Typing
 
 - Use PEP 604 unions (`X | Y`, `T | None`) and PEP 585 built-in generics (`list[int]`, `dict[str, Foo]`). Never `Optional`, `Union`, `List`, `Dict` in new code.

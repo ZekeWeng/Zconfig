@@ -20,7 +20,7 @@ Minimum code that solves the problem. Nothing speculative.
 - No abstractions for single-use code — three similar lines beat a premature abstraction
 - No "flexibility," configurability, feature flags, or extension points until a second use case exists
 - No error handling for impossible scenarios
-- Delete dead code — don't comment it out or leave `// removed` markers
+- Delete dead code *you introduce* — don't comment it out or leave `// removed` markers (pre-existing dead code: mention it, don't delete — see Surgical changes)
 - If 200 lines could be 50, rewrite it
 - Senior-engineer check: "Would they call this overcomplicated?" If yes, simplify
 

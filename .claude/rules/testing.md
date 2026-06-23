@@ -1,9 +1,9 @@
 ---
 paths:
-  - "**/*test*"
-  - "**/*spec*"
+  - "**/test_*.py"
+  - "**/*_test.py"
+  - "**/tests/**"
   - "**/__tests__/**"
-  - "**/*_test.*"
 ---
 
 # Testing
