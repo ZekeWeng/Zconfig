@@ -16,6 +16,7 @@ brew "tree-sitter-cli"   # CLI required by nvim-treesitter `main` branch (nvim 0
 # AI Tools — native binaries (no Node.js / no npm)
 cask "claude"           # Claude Desktop app
 cask "codex"            # OpenAI Codex CLI
+cask "cursor"           # Cursor — AI code editor
 
 # Editor and Claude Code CLI are installed by mac/install.sh via direct
 # downloads with SHA256 verification (brew casks were unreliable for

@@ -205,6 +205,14 @@ tags = ["app"]
 [tools.claude-desktop.options]
 cask = true
 
+[tools.cursor]
+manager = "brew"
+package = "cursor"
+platforms = ["macos"]
+tags = ["app"]
+[tools.cursor.options]
+cask = true
+
 [tools.slack]
 manager = "brew"
 package = "slack"
