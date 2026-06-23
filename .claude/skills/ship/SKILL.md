@@ -37,10 +37,10 @@ Sync, test, push, and open a draft PR — applies `.claude/rules/git-workflow.md
 
 5. **Push.** `git push -u origin $(git rev-parse --abbrev-ref HEAD)`.
 
-6. **Open draft PR.**
+6. **Open draft PR.** Title: use $ARGUMENTS if given, else synthesize one from the commit subjects.
    ```bash
    gh pr create --draft \
-     --title "${ARGUMENTS:-<synthesize from commit subjects>}" \
+     --title "<title>" \
      --body "$(cat <<'EOF'
    ## Summary
    <1–3 bullets of what this changes>

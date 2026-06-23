@@ -15,10 +15,10 @@ Review staged changes or a PR across correctness, security, performance, maintai
 ## Context
 
 ### Changes to review
-!`if [ -n "$ARGUMENTS" ]; then gh pr diff $ARGUMENTS; else git diff --cached; fi`
+!`if [ -n "$ARGUMENTS" ]; then gh pr diff "$ARGUMENTS"; else git diff --cached; fi`
 
 ### PR description (if applicable)
-!`if [ -n "$ARGUMENTS" ]; then gh pr view $ARGUMENTS; else echo "Reviewing staged changes (no PR)."; fi`
+!`if [ -n "$ARGUMENTS" ]; then gh pr view "$ARGUMENTS"; else echo "Reviewing staged changes (no PR)."; fi`
 
 ## Review checklist
 
