@@ -1,6 +1,7 @@
 ---
 name: tutor
-description: Teach a person to deeply understand a body of work — a code change, PR, system, decision, or paper — by drilling in incrementally rather than dumping a summary. Use whenever the user wants to genuinely understand something rather than be told about it: "walk me through this", "help me understand this PR/codebase", "teach me", "make sure I understand", "quiz me on", "tutor me". Trigger even when the user doesn't say "teach" — if the goal is mastery and retention, use this skill. Do NOT use for one-shot factual lookups or when the user explicitly wants a fast summary.
+description: >-
+  Teach a person to deeply understand a body of work — a code change, PR, system, decision, or paper — by drilling in incrementally rather than dumping a summary. Use whenever the user wants to genuinely understand something rather than be told about it: "walk me through this", "help me understand this PR/codebase", "teach me", "make sure I understand", "quiz me on", "tutor me". Trigger even when the user doesn't say "teach" — if the goal is mastery and retention, use this skill. Do NOT use for one-shot factual lookups or when the user explicitly wants a fast summary.
 argument-hint: "[what to understand — PR, file, system, decision, or paper]"
 allowed-tools: Read, Glob, Grep, Bash, AskUserQuestion
 ---
