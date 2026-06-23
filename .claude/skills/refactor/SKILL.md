@@ -21,7 +21,7 @@ Surgical-changes discipline applies throughout — see `.claude/rules/working-st
 3. **Re-test.** Run the test command again. Every baseline-passing test must still pass.
 4. **Diff review.** Run `git diff`. Every hunk should be pure restructure — extraction, renaming, reordering, dedup. If you see added branches or new logic, revert those hunks.
 
-## Hard Stops
+## Hard stops
 
 - Baseline tests fail → stop, do not refactor. Report which test failed.
 - Re-test reveals a regression → revert, report which test broke.

@@ -10,6 +10,8 @@ agent: general-purpose
 
 # Code Review
 
+Review staged changes or a PR across correctness, security, performance, maintainability, and tests.
+
 ## Context
 
 ### Changes to review
@@ -18,7 +20,7 @@ agent: general-purpose
 ### PR description (if applicable)
 !`if [ -n "$ARGUMENTS" ]; then gh pr view $ARGUMENTS; else echo "Reviewing staged changes (no PR)."; fi`
 
-## Review Checklist
+## Review checklist
 
 Analyze the changes above for:
 
@@ -28,7 +30,7 @@ Analyze the changes above for:
 4. **Maintainability**: Naming clarity, dead code, missing error handling, code duplication
 5. **Tests**: Adequate coverage, edge cases, test quality
 
-## Output Format
+## Output format
 
 For each finding, provide:
 - **Severity**: critical / warning / nit

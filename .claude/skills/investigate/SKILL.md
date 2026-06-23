@@ -9,6 +9,8 @@ context: fork
 
 # Investigate: $ARGUMENTS
 
+Find the root cause before changing code — and stop after three failed fixes.
+
 ## Protocol
 
 1. **Reproduce.** Confirm the bug with a minimal, deterministic repro. If you can't reproduce, stop and ask for more detail.
@@ -16,7 +18,7 @@ context: fork
 3. **Hypothesize.** Write down the suspected root cause in one sentence *before* touching any code.
 4. **Verify.** Apply the minimal fix. Re-run the repro. Done only when the repro passes.
 
-## Hard Stop: three-strike rule
+## Hard stop: three-strike rule
 
 If three attempted fixes fail to resolve the bug, **stop changing code**. Continuing past three attempts turns debugging into whack-a-mole. Instead return:
 

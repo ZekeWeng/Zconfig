@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 # Commit
 
+Conventional commit from the staged diff — follows `.claude/rules/git-workflow.md`.
+
 ## Context
 - Staged diff: !`git diff --cached`
 - Unstaged: !`git diff --stat`

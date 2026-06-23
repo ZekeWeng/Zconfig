@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 # Ship
 
+Sync, test, push, and open a draft PR — applies `.claude/rules/git-workflow.md` and `working-style.md`.
+
 ## Preflight
 
 !`git status --short`
@@ -26,7 +28,7 @@ disable-model-invocation: true
 
 3. **Test.** Detect the project test command (`package.json` scripts, `Makefile`, `justfile`, `pytest`, `go test ./...`, `cargo test`). Run it. **If tests fail, stop and report.** Never ship red.
 
-4. **Self-review.** Run `git diff origin/$default..HEAD`. Apply the "Surgical Changes" test from `.claude/rules/working-style.md` — every changed line should trace to the user's request. Confirm:
+4. **Self-review.** Run `git diff origin/$default..HEAD`. Apply the "Surgical changes" test from `.claude/rules/working-style.md` — every changed line should trace to the user's request. Confirm:
    - No debug prints (`console.log`, `print()`, `dbg!`)
    - No commented-out code blocks
    - No stray files (`.DS_Store`, `*.swp`, editor backups)
