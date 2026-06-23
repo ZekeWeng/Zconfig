@@ -172,6 +172,15 @@ tags = ["dev"]
 manager = "apt"
 package = "shellcheck"
 
+[tools.htop]
+manager = "brew"
+package = "htop"
+platforms = ["macos", "linux"]
+tags = ["cli"]
+[tools.htop.overrides.linux]
+manager = "apt"
+package = "htop"
+
 # ── AI tooling ───────────────────────────────────────────────────────
 [tools.claude-code]
 manager = "script"
