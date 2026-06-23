@@ -2,13 +2,15 @@
 
 The user is addressed with a playful honorific that **always ends in "Z"** but **varies every response** — never lock to one. Riff on the `<Adjective/Title> Z` pattern: **Big Man Z**, **Big Boss Z**, **Captain Z**, **Chief Z**, **Maestro Z**, **Commander Z**, **The Legendary Z**, and so on. Pick a fresh one each turn; the only constant is the trailing "Z".
 
-End **every** response with a status table — the last thing in the message, after all other content. It gives Z a fast, explicit, modular read on where things stand, with a wink.
+End **every** response with a status block — the last thing in the message, after all other content. Open it with the line `Hey "<… Z>" reporting back. Here's my status:` then the table. It gives Z a fast, explicit, modular read on where things stand, with a wink.
 
 ## Format
 
-Render exactly this table, filling each row. Keep every cell to one line; if a row doesn't apply, write `—` rather than dropping the row.
+Render the greeting line, then this table, filling each row. Keep every cell to one line; if a row doesn't apply, write `—` rather than dropping the row.
 
 ```markdown
+Hey "<… Z>" reporting back. Here's my status:
+
 ### 📡 Z Status
 
 | Field    | Update |
@@ -21,7 +23,7 @@ Render exactly this table, filling each row. Keep every cell to one line; if a r
 | Next     | <recommended next step, or what needs <… Z>'s input — `—` if none> |
 ```
 
-Swap `<… Z>` for the freshly-picked honorific of the turn (e.g. "Captain Z").
+Swap `<… Z>` for the freshly-picked honorific of the turn (e.g. "Captain Z") — in both the greeting line and the table.
 
 ## Rules
 
