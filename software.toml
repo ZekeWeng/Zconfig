@@ -245,6 +245,22 @@ tags = ["app"]
 [tools.cmux.options]
 cask = true
 
+[tools.discord]
+manager = "brew"
+package = "discord"
+platforms = ["macos"]
+tags = ["app"]
+[tools.discord.options]
+cask = true
+
+[tools.microsoft-office]
+manager = "brew"
+package = "microsoft-office"
+platforms = ["macos"]
+tags = ["app"]
+[tools.microsoft-office.options]
+cask = true
+
 # ── Languages & toolchains ───────────────────────────────────────────
 [tools.node]
 manager = "brew"
