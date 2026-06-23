@@ -213,6 +213,14 @@ tags = ["app"]
 [tools.cursor.options]
 cask = true
 
+[tools.codex-app]
+manager = "brew"
+package = "codex-app"
+platforms = ["macos"]
+tags = ["app"]
+[tools.codex-app.options]
+cask = true
+
 [tools.slack]
 manager = "brew"
 package = "slack"
