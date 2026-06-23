@@ -29,6 +29,7 @@ cask "ghostty"
 cask "cmux"
 cask "discord"
 cask "microsoft-office"   # full Office suite — Word, Excel, PowerPoint, Outlook, OneNote
+cask "zoom"
 
 # Development
 brew "node@22"       # LTS — bare `node` floats to current; pin for reproducibility

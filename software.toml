@@ -261,6 +261,14 @@ tags = ["app"]
 [tools.microsoft-office.options]
 cask = true
 
+[tools.zoom]
+manager = "brew"
+package = "zoom"
+platforms = ["macos"]
+tags = ["app"]
+[tools.zoom.options]
+cask = true
+
 # ── Languages & toolchains ───────────────────────────────────────────
 [tools.node]
 manager = "brew"
