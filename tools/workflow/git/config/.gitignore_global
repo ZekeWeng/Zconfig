@@ -85,3 +85,5 @@ service-account*.json
 *.temp
 *.bak
 *.backup
+
+**/.claude/settings.local.json
