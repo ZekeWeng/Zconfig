@@ -1,7 +1,7 @@
 # Ghostty — matched to the Zconfig look: Catppuccin Mocha (same colorscheme as
 # Neovim) + JetBrains Mono Nerd Font (the installed Nerd Font cask).
 
-theme = catppuccin-mocha
+theme = Catppuccin Mocha
 font-family = JetBrainsMono Nerd Font
 font-size = 14
 
