@@ -1,6 +1,8 @@
-# Architecture — Hexagonal / Ports & Adapters
+# Architecture
 
-## Core Principle
+How to structure code in this repo: hexagonal, ports & adapters.
+
+## Core principle
 
 Dependencies point **inward**. The domain core knows nothing about the outside world.
 
@@ -26,14 +28,14 @@ Adapters → Ports (interfaces) → Core Domain
 - The composition root is the **only** place that knows about concrete adapters
 - When adding new functionality, always ask: does this belong in core, a port, or an adapter?
 
-## Dependency Direction Violations to Watch For
+## Dependency-direction violations to watch for
 
 - Core importing an HTTP library, database driver, or filesystem package
 - A domain model containing serialization annotations (JSON tags, ORM decorators)
 - Business logic directly calling `fetch()`, `fs.readFile()`, `exec()`, or equivalent
 - An adapter calling another adapter — route through core or create a shared port
 
-## Module Boundaries
+## Module boundaries
 
 - Each module/package should have a **single public entry point** (barrel export, facade, or public API surface)
 - Modules communicate through their public interfaces, never by reaching into internals

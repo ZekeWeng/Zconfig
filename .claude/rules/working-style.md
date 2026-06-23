@@ -1,8 +1,8 @@
-# Working Style
+# Working style
 
 Behavioral guidelines that bias toward caution over speed. For trivial tasks, use judgment. These complement the code-shape rules in `general.md` and the architectural rules in `architecture.md` — they govern **how** you work, not what the code looks like.
 
-## Think Before Coding
+## Think before coding
 
 Don't assume. Don't hide confusion. Surface tradeoffs.
 
@@ -11,7 +11,7 @@ Don't assume. Don't hide confusion. Surface tradeoffs.
 - If a simpler approach exists, say so — push back when warranted
 - If something is unclear, stop, name what's confusing, and ask
 
-## Simplicity First
+## Simplicity first
 
 Minimum code that solves the problem. Nothing speculative.
 
@@ -24,7 +24,7 @@ Minimum code that solves the problem. Nothing speculative.
 - If 200 lines could be 50, rewrite it
 - Senior-engineer check: "Would they call this overcomplicated?" If yes, simplify
 
-## Surgical Changes
+## Surgical changes
 
 Touch only what you must. Clean up only your own mess.
 
@@ -36,7 +36,7 @@ Touch only what you must. Clean up only your own mess.
 - Don't remove pre-existing dead code unless asked
 - The test: every changed line should trace directly to the user's request
 
-## Goal-Driven Execution
+## Goal-driven execution
 
 Define success criteria up front. Loop until verified.
 
@@ -55,7 +55,7 @@ For multi-step tasks, state a brief plan before starting:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-## Signal That These Are Working
+## Signal that these are working
 
 - Fewer unnecessary changes in diffs
 - Fewer rewrites caused by overcomplication

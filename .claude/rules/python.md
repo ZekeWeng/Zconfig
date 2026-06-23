@@ -4,7 +4,9 @@ paths:
   - "**/pyproject.toml"
 ---
 
-# Idiomatic Python (3.12+)
+# Python
+
+Idiomatic Python for new code, 3.12+ baseline.
 
 ## Typing
 
@@ -18,7 +20,7 @@ paths:
 - Use `ParamSpec` + `Concatenate` for decorators that preserve the wrapped signature.
 - Run `pyright` (or `mypy --strict`) in CI. Untyped code is unverified code.
 
-## Data Modeling
+## Data modeling
 
 - `@dataclass(slots=True, frozen=True)` is the default for internal value objects — stdlib, zero deps, fast.
 - Reach for `attrs` when you need converters, composable validators, or `__init_subclass__` hooks dataclasses lack.
@@ -26,7 +28,7 @@ paths:
 - Never put ORM/JSON annotations on domain models; translate at the adapter layer.
 - Prefer `kw_only=True` for models with more than 3 fields — positional construction gets unreadable.
 
-## Error Handling
+## Error handling
 
 - Derive a single package-root exception (e.g. `AppError`) and subclass from it. Callers filter one hierarchy.
 - Chain with `raise NewError(...) from err` to preserve causality. Use `from None` only when deliberately hiding.
@@ -45,14 +47,14 @@ paths:
 - Prefer `anyio` for Trio/asyncio portability and cleaner cancellation semantics.
 - Every `create_task` must be awaited or owned by a `TaskGroup`. Orphan tasks get GC'd mid-flight.
 
-## Iteration & Comprehensions
+## Iteration & comprehensions
 
 - Comprehensions are for mapping/filtering one collection into another. If you see nested `for` or `if/else` doing work, write a loop.
 - Use generator expressions (`sum(x*x for x in xs)`) for aggregation. Don't materialize lists you immediately consume.
 - Reach for `itertools` (`pairwise`, `batched` (3.12+), `chain`, `groupby`) before hand-rolling index math.
 - Unpack with `*rest` and starred assignment rather than slicing.
 
-## Context Managers
+## Context managers
 
 - Any acquire/release pair (file, lock, transaction, tempdir, subprocess) belongs in a `with` block.
 - Write new ones with `@contextlib.contextmanager`. Only drop to `__enter__`/`__exit__` when the object's lifecycle is the class's primary concern.
@@ -74,7 +76,7 @@ paths:
 - Pytest: `tmp_path`, parametrize over loops, fixtures over setup/teardown, one assertion concept per test.
 - Enforce `ruff check`, formatter, and type-check in both pre-commit AND CI. Local-only checks get bypassed.
 
-## Project Structure
+## Project structure
 
 - Use `src/` layout — prevents accidental imports from repo root and forces install-before-test.
 - Single `pyproject.toml`. No `setup.py`, no `requirements.txt`, no `setup.cfg`.
@@ -82,7 +84,7 @@ paths:
 - Pin runtime deps loosely (`>=`); pin dev deps exactly via `uv.lock`.
 - Group code by feature/domain (`users/`, `billing/`), not by layer (`models/`, `views/`).
 
-## Anti-Patterns
+## Anti-patterns
 
 - Never use mutable defaults (`def f(x=[])`) — use `None` and assign inside.
 - `pathlib.Path` everywhere. `os.path` is a smell outside of legacy compat shims.
