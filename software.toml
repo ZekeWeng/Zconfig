@@ -277,6 +277,22 @@ tags = ["app"]
 [tools.zoom.options]
 cask = true
 
+[tools.whatsapp]
+manager = "brew"
+package = "whatsapp"
+platforms = ["macos"]
+tags = ["app"]
+[tools.whatsapp.options]
+cask = true
+
+[tools.wechat]
+manager = "brew"
+package = "wechat"
+platforms = ["macos"]
+tags = ["app"]
+[tools.wechat.options]
+cask = true
+
 # ── Languages & toolchains ───────────────────────────────────────────
 [tools.node]
 manager = "brew"
@@ -343,6 +359,14 @@ manager = "brew"
 package = "awscli"
 platforms = ["macos"]
 tags = ["infra", "cli"]
+
+[tools.docker-desktop]
+manager = "brew"
+package = "docker-desktop"
+platforms = ["macos"]
+tags = ["infra"]
+[tools.docker-desktop.options]
+cask = true
 
 # ── Fonts ────────────────────────────────────────────────────────────
 [tools.nerd-font-jetbrains]

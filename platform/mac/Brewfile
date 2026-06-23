@@ -31,6 +31,8 @@ cask "cmux"
 cask "discord"
 cask "microsoft-office"   # full Office suite — Word, Excel, PowerPoint, Outlook, OneNote
 cask "zoom"
+cask "whatsapp"
+cask "wechat"
 
 # Development
 brew "node@22"       # LTS — bare `node` floats to current; pin for reproducibility
@@ -44,6 +46,7 @@ brew "elixir"
 brew "postgresql@15"
 brew "rabbitmq"
 brew "awscli"
+cask "docker-desktop"
 
 # Fonts
 cask "font-jetbrains-mono-nerd-font"
