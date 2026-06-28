@@ -32,6 +32,7 @@ Format: `<type>: <short description>`
 - One concern per commit — never bundle formatting, refactoring, and features together
 - Write commit messages that explain **why**, not what
 - Verify changes are tightly scoped before committing
+- Never add `Co-Authored-By` or any AI-attribution trailer to commits or PRs
 
 ## Branch naming
 
